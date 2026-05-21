@@ -12,18 +12,30 @@ set -uo pipefail
 BLACKHOLE_DEVICE="BlackHole 2ch"
 
 API_URL="https://icanhazdadjoke.com/"
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 STATE_DIR="$HOME/.tuple/.state/dad-joke-greeter"
 MY_ROOM_FILE="$STATE_DIR/my-room"
-TRACKED_ROOMS_FILE="$HOME/.tuple/tracked-rooms"
+LOCAL_TRACKED_ROOMS_FILE="$SCRIPT_DIR/tracked-rooms"
+LEGACY_TRACKED_ROOMS_FILE="$HOME/.tuple/tracked-rooms"
+LOCAL_DISABLED_FILE="$SCRIPT_DIR/.disabled"
+LEGACY_GLOBAL_DISABLED_FILE="$HOME/.tuple/.dad-jokes-disabled"
 
-# Optional: touch ~/.tuple/.dad-jokes-disabled to disable without removing the trigger
-[[ ! -f "$HOME/.tuple/.dad-jokes-disabled" ]] || exit 0
+# Optional: touch .disabled next to this trigger to disable it.
+[[ ! -f "$LOCAL_DISABLED_FILE" && ! -f "$LEGACY_GLOBAL_DISABLED_FILE" ]] || exit 0
 
 is_self="${TUPLE_TRIGGER_IS_SELF:-false}"
 room_name="${TUPLE_TRIGGER_ROOM_NAME:-}"
 
-# If a tracked-rooms file exists, only trigger for rooms listed in it
-if [[ -f "$TRACKED_ROOMS_FILE" ]] && ! grep -qxF "$room_name" "$TRACKED_ROOMS_FILE"; then
+# If a tracked-rooms file exists, only trigger for rooms listed in it.
+# Prefer trigger-local config, but keep the original top-level path working.
+tracked_rooms_file=""
+if [[ -f "$LOCAL_TRACKED_ROOMS_FILE" ]]; then
+  tracked_rooms_file="$LOCAL_TRACKED_ROOMS_FILE"
+elif [[ -f "$LEGACY_TRACKED_ROOMS_FILE" ]]; then
+  tracked_rooms_file="$LEGACY_TRACKED_ROOMS_FILE"
+fi
+
+if [[ -n "$tracked_rooms_file" ]] && ! grep -qxF "$room_name" "$tracked_rooms_file"; then
   exit 0
 fi
 

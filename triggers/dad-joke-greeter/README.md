@@ -80,15 +80,27 @@ Local speaker output uses the system default — no configuration needed.
 
 ## Limiting to specific rooms
 
-By default, jokes trigger in any room you join. To restrict to specific rooms, create `~/.tuple/tracked-rooms` with one room name per line:
+By default, dad jokes can trigger in any Tuple room you join. If you only want jokes in certain rooms, add a `tracked-rooms` file next to the trigger scripts:
+
+```bash
+$EDITOR ~/.tuple/triggers/dad-joke-greeter/tracked-rooms
+```
+
+Put one room name on each line:
 
 ```
 Engineering
 Design Crit
+Friday Demo
 ```
-> **Room names are case-sensitive and must match exactly.** Use the room name as it appears in Tuple.
 
-When this file exists, only rooms listed in it will trigger jokes. Remove the file to go back to all rooms.
+When this file exists, only rooms listed in it will trigger jokes. Room names are case-sensitive and must match exactly as they appear in Tuple. Remove the file to go back to all rooms:
+
+```bash
+rm ~/.tuple/triggers/dad-joke-greeter/tracked-rooms
+```
+
+For compatibility with older installs, the trigger also checks `~/.tuple/tracked-rooms` when the trigger-local file does not exist. New installs should prefer `~/.tuple/triggers/dad-joke-greeter/tracked-rooms` so the trigger's configuration stays self-contained.
 
 ## Disabling temporarily
 
@@ -96,11 +108,13 @@ The simplest way to pause jokes without removing the trigger is a touch-file —
 
 ```bash
 # Disable
-touch ~/.tuple/.dad-jokes-disabled
+touch ~/.tuple/triggers/dad-joke-greeter/.disabled
 
 # Re-enable
-rm ~/.tuple/.dad-jokes-disabled
+rm ~/.tuple/triggers/dad-joke-greeter/.disabled
 ```
+
+For compatibility with older installs, `~/.tuple/.dad-jokes-disabled` also disables the trigger.
 
 Alternatively, remove or rename the trigger files in `~/.tuple/triggers/dad-joke-greeter/`.
 
