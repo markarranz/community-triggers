@@ -100,6 +100,8 @@ When this file exists, only rooms listed in it will trigger jokes. Room names ar
 rm ~/.tuple/triggers/dad-joke-greeter/tracked-rooms
 ```
 
+For existing installs, the older `~/.tuple/tracked-rooms` path is still supported when the trigger-local file does not exist. New installs should use `~/.tuple/triggers/dad-joke-greeter/tracked-rooms` so the trigger's configuration stays self-contained.
+
 ## Disabling temporarily
 
 The simplest way to pause jokes without removing the trigger is a touch-file — Tuple spawns trigger scripts as subprocesses, so environment variables set in your terminal won't propagate, but a file on disk is always visible:
@@ -111,6 +113,8 @@ touch ~/.tuple/triggers/dad-joke-greeter/.disabled
 # Re-enable
 rm ~/.tuple/triggers/dad-joke-greeter/.disabled
 ```
+
+For existing installs, the older `~/.tuple/.dad-jokes-disabled` path still disables the trigger. New installs should use `~/.tuple/triggers/dad-joke-greeter/.disabled`.
 
 Alternatively, remove or rename the trigger files in `~/.tuple/triggers/dad-joke-greeter/`.
 

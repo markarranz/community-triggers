@@ -16,10 +16,13 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 STATE_DIR="$HOME/.tuple/.state/dad-joke-greeter"
 MY_ROOM_FILE="$STATE_DIR/my-room"
 LOCAL_TRACKED_ROOMS_FILE="$SCRIPT_DIR/tracked-rooms"
+LEGACY_TRACKED_ROOMS_FILE="$HOME/.tuple/tracked-rooms"
 LOCAL_DISABLED_FILE="$SCRIPT_DIR/.disabled"
+LEGACY_DISABLED_FILE="$HOME/.tuple/.dad-jokes-disabled"
 
 # Optional: touch .disabled next to this trigger to disable it.
-[[ ! -f "$LOCAL_DISABLED_FILE" ]] || exit 0
+# The top-level .dad-jokes-disabled path is kept for existing installs.
+[[ ! -f "$LOCAL_DISABLED_FILE" && ! -f "$LEGACY_DISABLED_FILE" ]] || exit 0
 
 is_self="${TUPLE_TRIGGER_IS_SELF:-false}"
 room_name="${TUPLE_TRIGGER_ROOM_NAME:-}"
@@ -28,6 +31,8 @@ room_name="${TUPLE_TRIGGER_ROOM_NAME:-}"
 tracked_rooms_file=""
 if [[ -f "$LOCAL_TRACKED_ROOMS_FILE" ]]; then
   tracked_rooms_file="$LOCAL_TRACKED_ROOMS_FILE"
+elif [[ -f "$LEGACY_TRACKED_ROOMS_FILE" ]]; then
+  tracked_rooms_file="$LEGACY_TRACKED_ROOMS_FILE"
 fi
 
 if [[ -n "$tracked_rooms_file" ]] && ! grep -qxF "$room_name" "$tracked_rooms_file"; then
