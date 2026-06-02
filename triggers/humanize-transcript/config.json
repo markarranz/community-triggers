@@ -1,6 +1,7 @@
 {
   "name": "Humanize Transcript",
   "description": "Generate a human-readable markdown transcript from a Tuple call's raw artifacts.",
+  "category": "Call Summary",
   "platforms": ["macos"],
   "language": "python"
 }

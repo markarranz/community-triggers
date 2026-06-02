@@ -1,6 +1,7 @@
 {
   "name": "Pause Spotify",
   "description": "Automatically pause Spotify when a call starts.",
+  "category": "Focus",
   "platforms": ["macos"],
   "language": "applescript"
 }

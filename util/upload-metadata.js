@@ -86,7 +86,7 @@ module.exports = async function uploadMetadata({
         `triggers/${id}/config.json`,
         "utf-8"
       );
-      const { name, description, platforms, language } =
+      const { name, description, platforms, language, category } =
         JSON.parse(configContents);
       const readme = await readFile(`triggers/${id}/README.md`, "utf-8");
       const files = await getTriggerFileChecksums(id);
@@ -110,6 +110,7 @@ module.exports = async function uploadMetadata({
           contributors.map((c) => c.gitHubUserID)
         ),
         language,
+        category,
         readme,
         executables: new Set(executables),
         files,

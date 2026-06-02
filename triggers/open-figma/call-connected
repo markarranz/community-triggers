@@ -1,3 +1,0 @@
-#!/usr/bin/env osascript
-
-tell application "Figma" to activate

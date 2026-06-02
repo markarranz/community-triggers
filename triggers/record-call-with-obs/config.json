@@ -1,6 +1,7 @@
 {
   "name": "Record call with OBS",
   "description": "Use OBS to record the audio and video of a call",
+  "category": "Recording",
   "platforms": ["macos", "windows", "linux"],
   "language": "nodejs"
 }

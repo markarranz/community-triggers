@@ -24,3 +24,14 @@ exports.AVAILABLE_LANGUAGES = [
   "ruby",
   "applescript",
 ];
+exports.AVAILABLE_CATEGORIES = [
+  "Sidekick",
+  "Real-Time Coach",
+  "Call Summary",
+  "Focus",
+  "Privacy",
+  "Recording",
+  "Notifications",
+  "Workflow",
+  "Novelty",
+];
