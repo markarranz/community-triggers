@@ -1,6 +1,7 @@
 {
   "name": "Git Coauthors",
   "description": "Automatically add git coauthors when pairing on a call",
+  "category": "Workflow",
   "platforms": ["macos", "linux", "windows"],
   "language": "ruby"
 }

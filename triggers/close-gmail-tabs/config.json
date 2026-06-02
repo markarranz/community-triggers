@@ -1,6 +1,7 @@
 {
   "name": "Close Gmail tabs on Chrome",
   "description": "Automatically close Gmail tabs when sharing your screen.",
+  "category": "Privacy",
   "platforms": ["macos"],
   "language": "applescript"
 }

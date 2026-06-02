@@ -1,6 +1,7 @@
 {
   "name": "Do Not Disturb",
   "description": "Enable the Do Not Disturb focus mode when on a call",
+  "category": "Focus",
   "platforms": ["macos"],
   "language": "bash"
 }

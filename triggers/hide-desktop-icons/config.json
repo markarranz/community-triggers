@@ -1,6 +1,7 @@
 {
   "name": "Hide Desktop Icons",
   "description": "Hide all icons on your desktop when sharing your screen.",
+  "category": "Privacy",
   "platforms": ["macos"],
   "language": "bash"
 }

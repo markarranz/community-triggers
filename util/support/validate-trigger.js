@@ -4,6 +4,7 @@ const {
   AVAILABLE_TRIGGERS,
   AVAILABLE_PLATFORMS,
   AVAILABLE_LANGUAGES,
+  AVAILABLE_CATEGORIES,
 } = require("./config");
 
 const configSchema = z.object({
@@ -65,6 +66,27 @@ const configSchema = z.object({
           }\` in your \`config.json\` file is not valid. Valid languages are: ${AVAILABLE_LANGUAGES.map(
               (c) => `\`${c}\``
             ).join(", ")}.`,
+        };
+      }
+
+      return { message: ctx.defaultError };
+    },
+  }),
+  category: z.enum(AVAILABLE_CATEGORIES, {
+    errorMap: (issue, ctx) => {
+      if (issue.code === "invalid_type") {
+        return {
+          message: "`category` must be provided in your `config.json` file.",
+        };
+      }
+
+      if (issue.code === "invalid_enum_value") {
+        return {
+          message: `The category \`${
+            issue.received
+          }\` in your \`config.json\` file is not valid. Valid categories are: ${AVAILABLE_CATEGORIES.map(
+            (c) => `\`${c}\``
+          ).join(", ")}.`,
         };
       }
 
