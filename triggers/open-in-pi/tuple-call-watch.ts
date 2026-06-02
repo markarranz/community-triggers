@@ -219,8 +219,8 @@ export default function (pi: ExtensionAPI) {
         content:
           `New on the call:\n\n${batch}\n\n` +
           (urgent
-            ? "This includes a line addressed to you or a recording_stopped/call_ended event — act per your instructions."
-            : "Interject only if something here is worth it; otherwise reply with no text."),
+            ? "This includes a line addressed to you or a recording_stopped/call_ended event — respond per your instructions."
+            : "Leave a one-line `·` acknowledgment naming what's being discussed; escalate to `⚠` only if something matters."),
         display: false,
       },
       { triggerTurn: true },
