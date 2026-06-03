@@ -4,7 +4,7 @@ A [Tuple](https://tuple.app) trigger that runs [Claude Code](https://claude.ai/c
 
 One hook (`call-transcription-started`), two phases:
 
-- **During the call, the coach.** Watches the live pairing dynamic and fires a quiet macOS notification with a one-line move you can make when the session drifts into a known smell. Silent by default; only speaks when confident.
+- **During the call, the coach.** Watches the live pairing dynamic and, when the session drifts into a known smell, nudges you with a one-line move you can make. Every nudge is a terminal line plus a best-effort desktop notification, so it works without notification permission or off macOS; `terminal-notifier` is optional (clickable popups). Silent by default; only speaks when confident.
 - **When the call ends, the retro.** The same session reads the full transcript and writes `pairing-evaluation.md`: how the session ran, talk-time balance, anti-patterns with quotes, what worked, and the one thing to practice next time. Notifies you when it's ready.
 
 The pairing framework is embedded into the system prompt. You do **not** need any Claude skill installed for this trigger to work; drop the folder in and go.
@@ -15,8 +15,8 @@ The pairing framework is embedded into the system prompt. You do **not** need an
 
 While you're pairing:
 
-- Subscribes to the merged Tuple transcription stream so it wakes on new lines (no polling), plus a short fallback timer so it can notice *silences*: a quiet navigator or a grinding session produce no transcript to wake on.
-- Maps both participants to names once via `tuple state`, and tracks lightweight session state: talk-time balance, who last spoke, whether a goal was set, and how long it's been since a break or swap.
+- Follows the call with **Tuple's bundled watcher** (`tuple-call-watcher.py`, shipped with this trigger): it catches up on the backlog once, then `Monitor`s a continuous run that wakes the coach on each new batch of transcript read off disk (no polling), plus a short fallback timer so it can notice *silences*: a quiet navigator or a grinding session produce no transcript to wake on.
+- Maps both participants to names once from `user_joined` events, and tracks lightweight session state: talk-time balance, who last spoke, whether a goal was set, and how long it's been since a break or swap.
 - On each new line (or fallback tick), checks against the pairing smells in the system prompt.
 - When confidence is high and cooldown has elapsed, fires a **macOS notification** via `osascript`:
   - Title: `Pairing Coach — Backseat driving` / `… — Quiet pair` / `… — Silent driver` / `… — Swap` / `… — Drift` / `… — No goal yet` / `… — Take a break`
@@ -30,7 +30,7 @@ It does **not** post anywhere external. It does **not** speak in the call. Its t
 When the call genuinely ends (it ignores mid-call transcription toggles), the same session switches from coach to analyst:
 
 - Reads every `transcriptions.jsonl` on disk in chronological order for the complete record.
-- Writes a markdown retro to `pairing-evaluation.md` in the call root with:
+- Writes a markdown retro to `pairing-evaluation.md` in the call's session directory with:
   - **How the session ran**: shared goal up front? talk-time balance? swaps and breaks, or a grind?
   - **Anti-patterns that showed up**, each one named with a `[mm:ss]` quote behind it, so the pattern is something you can actually hear.
   - **What worked**: up to 3 good moves to repeat, such as a sharp question, a clean swap, or a well-narrated step.
@@ -51,7 +51,7 @@ When the call genuinely ends (it ignores mid-call transcription toggles), the sa
 
 - **macOS.** Opens your preferred terminal — Ghostty, iTerm, Alacritty, or Terminal (set `PREFERRED_TERM` to choose) — and uses `osascript` for notifications. Optionally `terminal-notifier` for click-to-open.
 - **Claude Code**: `npm install -g @anthropic-ai/claude-code`
-- **The `tuple` CLI**, which ships with Tuple.
+- **`python3`** for the bundled `tuple-call-watcher.py` (install with `xcode-select --install`).
 - **A Whisper model** configured in Tuple for live transcription. Email `support@tuple.app` if you need local transcription enabled for your team.
 - **Notification permission** for the AppleScript runner. The first time a notification tries to fire, macOS will prompt; accept it, otherwise the call is silent.
 
@@ -68,14 +68,16 @@ The hook fires automatically the next time you start transcription.
 
 ## How it works
 
-When `call-transcription-started` fires:
+When `call-transcription-started` fires, Tuple provides `TUPLE_TRIGGER_CALL_ARTIFACTS_DIRECTORY`, the directory holding the current call's transcription artifacts. This trigger:
 
-1. Detects which Tuple environment (`prod`, `staging`, `dev`) owns the call by probing each daemon's `state` for a matching call ID, and exports `TUPLE_ENV` so every `tuple` CLI call inside Claude scopes to the right daemon.
-2. Copies `system-prompt.md` into the call's artifact directory. If you have `~/.tuple/identity.md` (or the staging equivalent), it's appended so Claude knows your name and how you tend to pair, though the trigger works fine without it.
-3. Inlines the last 100 lifecycle events and last 100 transcript lines into the initial prompt so Claude has context if it joins mid-call.
-4. Opens your preferred terminal (Ghostty → iTerm → Alacritty → Terminal; override with `PREFERRED_TERM`) running Claude Code inside the call's artifact directory.
+1. Copies the fixed `tuple-call-watcher.py` into that directory so Claude runs it verbatim rather than re-authoring a poll loop each session.
+2. Copies `system-prompt.md` into that directory. If you have `~/.tuple/identity.md` (or the staging equivalent — inferred from the artifacts path), it's appended so Claude knows your name and how you tend to pair, though the trigger works fine without it.
+3. Writes an executable `launch-pairing-coach.command` wrapper into that directory and a short kickoff prompt telling Claude to catch up on the backlog first, then wait.
+4. Opens it in your preferred terminal (Ghostty → iTerm → Alacritty → Terminal; override with `PREFERRED_TERM`) via `open` (LaunchServices). No AppleScript and no direct binary launch, so it triggers no macOS accessibility prompt and no stray windows. The wrapper starts a login-interactive zsh, changes to the transcripts root, and runs Claude Code.
 
-The session stays subscribed to the transcription stream for the life of the call, coaching in real time. If transcription stops and restarts mid-call, the trigger sees the live PID file and exits; the existing session's subscription picks up the resumed stream without restarting. When the stream reports the call is genuinely over (an `HTTP 410 Gone` on the transcript endpoint), the session reads the full transcript from disk, writes `pairing-evaluation.md` in the call root, and fires the "retro ready" notification.
+The session follows the call by reading transcripts off disk through the bundled watcher for the life of the call, coaching in real time. A PID file (`.pairing-coach-<call-id>.pid`, keyed on the call id) keeps a second transcription start from launching a duplicate coach: if transcription stops and restarts mid-call, the trigger sees the live PID and exits, and the running coach's watcher picks up the new session directory automatically (it follows every `*@<call-id>/` directory). When a `call_ended` event arrives on the stream, the session reads the full transcript from disk, writes `pairing-evaluation.md` into the active session directory, and fires the "retro ready" notification.
+
+For local testing without opening a terminal, set `CLAUDE_PAIRING_COACH_DRY_RUN=1`; it writes the prompt and launcher and exits.
 
 ## Identity (optional)
 
@@ -100,7 +102,6 @@ All behavior lives in `system-prompt.md`:
 - **Cooldown / per-call cap.** Default 180s between notifications, max 5 per call.
 - **Silence sensitivity.** The ~3-minute "quiet pair" and ~25-minute "swap" thresholds live in **The framework**; the ~6-minute functional fallback timer lives in **Setup**. Loosen them for long heads-down sessions, tighten for fast back-and-forth work.
 - **Notification style.** Swap `osascript` for `terminal-notifier` in **Notification format** if you have it installed.
-- **Stream interval.** 30s keeps wake rate low at the cost of ~30s lag; drop to `10s` for snappier reactions.
 - **End-of-call retro.** Edit the retro template and calibration in **On call end** directly. Add or drop sections, but keep the final `SUMMARY:` line so the notification body has something to show.
 
 ## Acknowledgments
