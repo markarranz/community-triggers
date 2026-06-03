@@ -2,7 +2,7 @@
 
 Launches [Pi](https://pi.dev/) in the current Tuple transcription directory when transcription starts.
 
-The trigger writes an `open-in-pi.command` wrapper next to the live transcript files and opens it in your preferred terminal. The wrapper runs as `#!/bin/zsh -li`, so `pi` resolves from the same interactive shell environment you get in a new terminal. Nothing is hard-coded: Pi uses whichever provider and model you have configured as your default.
+The trigger writes an `launch-pi-sidekick.command` wrapper next to the live transcript files and opens it in your preferred terminal. The wrapper runs as `#!/bin/zsh -li`, so `pi` resolves from the same interactive shell environment you get in a new terminal. Nothing is hard-coded: Pi uses whichever provider and model you have configured as your default.
 
 ## What makes this one different
 
@@ -34,7 +34,7 @@ When `call-transcription-started` fires, Tuple provides `TUPLE_TRIGGER_CALL_ARTI
 
 1. Copies the shipped `tuple-call-watch.ts` into `.pi/extensions/` inside that directory and writes a `tuple-call-watch.config.json` next to it (the artifacts directory and call id).
 2. Writes `pi-sidekick-prompt.md` into that directory.
-3. Writes an executable `open-in-pi.command` wrapper into that directory.
+3. Writes an executable `launch-pi-sidekick.command` wrapper into that directory.
 4. Opens it in your preferred terminal via `open` (LaunchServices). With `PREFERRED_TERM` empty it opens in your default handler for `.command` files; set it to one of `ghostty | iterm | alacritty | terminal` to force one. No AppleScript, so it triggers no macOS accessibility prompt.
 5. The wrapper starts a login-interactive zsh, changes into the transcription directory, and runs `pi --name "Tuple Pi Sidekick" "$(cat pi-sidekick-prompt.md)"`. Pi auto-discovers `.pi/extensions/*.ts` from that directory, so the watcher is active immediately.
 

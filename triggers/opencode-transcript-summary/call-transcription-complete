@@ -41,7 +41,7 @@ PROMPT_FILE="${TRANSCRIPTION_DIR}/opencode-summary-prompt.md"
 # One of: ghostty | iterm | alacritty | terminal
 # (Also overridable from the environment: PREFERRED_TERM=iterm)
 PREFERRED_TERM="${PREFERRED_TERM:-}"
-LAUNCHER_FILE="${TRANSCRIPTION_DIR}/summarize-in-opencode.command"
+LAUNCHER_FILE="${TRANSCRIPTION_DIR}/launch-opencode-summary.command"
 TRIGGER_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 WATCHER_SRC="${TRIGGER_DIR}/tuple-call-watcher.py"
 WATCHER_DST="${TRANSCRIPTION_DIR}/tuple-call-watcher.py"

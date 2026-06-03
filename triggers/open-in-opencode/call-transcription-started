@@ -40,7 +40,7 @@ fi
 
 PID_FILE="${TRANSCRIPTION_DIR}/opencode-sidekick.pid"
 PROMPT_FILE="${TRANSCRIPTION_DIR}/opencode-sidekick-prompt.md"
-LAUNCHER_FILE="${TRANSCRIPTION_DIR}/open-in-opencode.command"
+LAUNCHER_FILE="${TRANSCRIPTION_DIR}/launch-opencode-sidekick.command"
 TRIGGER_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 WATCHER_SRC="${TRIGGER_DIR}/tuple-call-watcher.py"
 WATCHER_DST="${TRANSCRIPTION_DIR}/tuple-call-watcher.py"
