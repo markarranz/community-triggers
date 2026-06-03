@@ -11,7 +11,7 @@ When `call-transcription-started` fires, this trigger opens your preferred termi
 - **Answers when addressed.** Say "Claude, ..." (or type into the terminal) and it responds to that turn, then keeps listening.
 - **Summarizes.** It writes a checkpoint summary when recording stops and a final summary (decisions, action items, open threads) when the call ends.
 
-Claude runs with `--allowed-tools Read Monitor`: it reads the transcript JSONL files and uses the `Monitor` tool to wake on new transcript as it lands.
+Claude follows the call with **Tuple's bundled watcher** (`tuple-call-watcher.py`), shipped with this trigger and run verbatim — a fixed, deterministic script rather than a poll loop the model re-authors each session. Claude runs it once via `Bash --catchup` to read the backlog, then `Monitor`s a continuous run for live updates. It runs with `--allowed-tools Read Bash Monitor`.
 
 ## Choosing your terminal
 
@@ -21,12 +21,13 @@ By default the trigger opens the first installed of **Ghostty → iTerm → Alac
 PREFERRED_TERM="iterm"   # ghostty | iterm | alacritty | terminal
 ```
 
-The terminal runs `launch-claude-sidekick.sh`, whose `#!/bin/zsh -li` shebang sources your `~/.zprofile` and `~/.zshrc`, so `claude` resolves from the same PATH and environment you get in a normal terminal.
+The terminal runs `launch-claude-sidekick.command`, whose `#!/bin/zsh -li` shebang sources your `~/.zprofile` and `~/.zshrc`, so `claude` resolves from the same PATH and environment you get in a normal terminal.
 
 ## Prerequisites
 
 - macOS
 - [Claude Code](https://claude.com/claude-code) installed so `claude` works in a new terminal
+- `python3` (the bundled watcher needs it; install with `xcode-select --install`)
 - Tuple transcription enabled for the call
 
 ## Installation
@@ -41,10 +42,10 @@ The trigger fires the next time call transcription starts.
 
 When `call-transcription-started` fires, Tuple provides `TUPLE_TRIGGER_CALL_ARTIFACTS_DIRECTORY`, the directory holding the current call's transcription artifacts. This trigger:
 
-1. Writes `claude-sidekick-prompt.md` into that directory.
-2. Writes an executable `launch-claude-sidekick.sh` wrapper into that directory.
-3. Opens it in your preferred terminal (no `.command` file or LaunchServices default handler — it invokes the terminal directly, falling back to Terminal.app via `osascript`).
-4. The wrapper starts a login-interactive zsh, changes into the transcription directory, and runs `claude` with the prompt.
+1. Copies the fixed `tuple-call-watcher.py` and writes `claude-sidekick-prompt.md` into that directory.
+2. Writes an executable `launch-claude-sidekick.command` wrapper into that directory.
+3. Opens it in your preferred terminal via `open` (LaunchServices). No AppleScript and no direct binary launch, so it triggers no macOS accessibility prompt and no stray windows.
+4. The wrapper starts a login-interactive zsh, changes to the transcripts root, and runs `claude` with the prompt; Claude runs the bundled watcher to catch up and follow the call.
 
 A PID file (`claude-sidekick.pid`) keeps a second transcription start from launching a duplicate sidekick for the same call.
 

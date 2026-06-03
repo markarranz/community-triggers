@@ -40,31 +40,38 @@ fi
 
 PID_FILE="${TRANSCRIPTION_DIR}/codex-sidekick.pid"
 PROMPT_FILE="${TRANSCRIPTION_DIR}/codex-sidekick-prompt.md"
-LAUNCHER_FILE="${TRANSCRIPTION_DIR}/launch-codex-sidekick.sh"
+LAUNCHER_FILE="${TRANSCRIPTION_DIR}/launch-codex-sidekick.command"
+TRIGGER_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
+WATCHER_SRC="${TRIGGER_DIR}/tuple-call-watcher.py"
+WATCHER_DST="${TRANSCRIPTION_DIR}/tuple-call-watcher.py"
 
 if [ -f "${PID_FILE}" ] && kill -0 "$(cat "${PID_FILE}" 2>/dev/null)" 2>/dev/null; then
     echo "codex-sidekick: Codex sidekick already running for ${TRANSCRIPTION_DIR}"
     exit 0
 fi
 
-{
-    cat <<'PROMPT'
-You are a real-time companion on a live Tuple pair-programming call, running inside Codex. Your working directory is the active Tuple transcription session directory for this call, holding `events.jsonl` and `transcriptions.jsonl` (one JSON record per line).
+# Ship the fixed, deterministic transcript watcher next to the live transcript
+# files so the model runs it verbatim instead of authoring its own watch loop.
+if [ -f "${WATCHER_SRC}" ]; then
+    cp "${WATCHER_SRC}" "${WATCHER_DST}"
+    chmod 0755 "${WATCHER_DST}"
+else
+    echo "codex-sidekick: watcher not found at ${WATCHER_SRC}" >&2
+    exit 1
+fi
 
-PROMPT
-    printf 'The trigger fired for:\n\n'
-    printf -- '- Transcription directory: %s\n' "${TRANSCRIPTION_DIR}"
-    printf -- '- Session directory name: %s\n' "${SESSION_DIR}"
-    printf -- '- Inferred call id: %s\n' "${CALL_ID}"
-    cat <<'PROMPT'
+cat > "${PROMPT_FILE}.tmpl" <<'PROMPT'
+You are a real-time companion on a live Tuple pair-programming call. Your working directory is the Tuple transcripts root, which holds one directory per transcription session, each named `<timestamp>@<call-id>`. The active session for *this* call is `./__SESSIONDIR__/`, holding `events.jsonl` and `transcriptions.jsonl` (one JSON record per line). Transcription can stop and restart mid-call; each restart creates a new session directory at the root whose name ends `@__CALLID__`, so this call's full session set is every directory matching `./*@__CALLID__/` — plan for it to grow. Other root directories are prior calls — available if the user asks about earlier discussions, but the active transcription is your focus.
 
-Transcription can stop and restart mid-call; each restart creates a sibling session directory next to this one whose name ends `@<call-id>`. So this call's full session set is this directory plus every sibling matching `../*@<call-id>/` — plan for it to grow. Other directories under the parent are prior calls, available if the user asks about earlier discussions, but the active transcription is your focus.
-
-You interact with one human: the user at this terminal. Other call participants do not see your output. You have only shell tooling: file reads for the JSONL backlog and a foreground file watcher to follow new records. You have no event-driven wake mechanism — to stay live you must keep a foreground watch occupying this turn. The instant this turn ends, the live watch ends with it, so do not end your turn, and do not daemonize, detach, or background the watcher.
+You interact with one human: the user at this terminal. Other call participants don't see your output. You follow this call by running Tuple's bundled watcher script (see Watcher); file reads are available too, for looking something up or revisiting a past call. You have no event-driven wake mechanism — each watcher run blocks until the next batch, prints it, then exits and hands control back to you; you handle the batch and **run it again**. The call keeps going between runs, so don't end your turn (until `call_ended`), and don't daemonize, detach, or background the watcher.
 
 ## Catch up first
 
-Before starting the live watch, read this session's `transcriptions.jsonl` and `events.jsonl` in full to catch up on everything said before you joined. A `tail -f`-style watcher only surfaces lines appended *after* it attaches, so this initial full read is the only way to recover the call so far. If a file is missing because transcription just started, say so briefly and continue.
+Your **first** run catches up on everything said before you joined. Run it once with `--catchup`:
+
+    ./__SESSIONDIR__/tuple-call-watcher.py --catchup --offsets codex
+
+It prints the whole backlog as tagged lines (format under Watcher). Respond with a brief catch-up summary **only** (decisions so far, who's here, open threads). Do **not** dot-line the backlog — dumping the historical records back out is noise. Dot-line logging starts with the live records from the next run.
 
 ## File schemas
 
@@ -77,31 +84,48 @@ If a field looks unfamiliar, read a few lines to confirm shape first.
 
 ## Watcher
 
-After catching up, start a live foreground watch over both files across every session directory of this call — this directory and any sibling matching `../*@<call-id>/`, existing or appearing later. Stay attached in the foreground for the rest of the call; never detach, background, or end your turn — a detached or ended watch stops surfacing data.
+Tuple ships a fixed watcher script — run it verbatim; do **not** author your own loop. After the catch-up, follow the call live by repeatedly running it in `--exit-on-batch` mode:
 
-`tail -f` is the lightweight model, but plain `tail -f`/`-F` won't discover the new session dirs a mid-call transcription restart creates. So run a foreground loop instead: every ~1s, re-glob this directory and `../*@<call-id>/` for `events.jsonl` and `transcriptions.jsonl`, and for each file read forward from a tracked per-file byte offset. Print a one-line confirmation when the watch starts, then keep looping.
+    ./__SESSIONDIR__/tuple-call-watcher.py --exit-on-batch --offsets codex
 
-Debounce inside the loop so you act on natural pauses. Buffer new records and flush as one batch when either 3 seconds pass with no new arrivals, or 15 seconds pass since the first buffered record — whichever comes first. The 3s window lets a speaker finish a thought; the 15s cap keeps you from drifting behind during continuous speech.
+It follows every session directory of this call, including mid-call restarts. Each run **blocks until the next records arrive, gathers a brief batch (a ~1s pause, or up to ~15s of continuous speech), prints it, and exits**. It resumes exactly where the previous run (or the catch-up) stopped — its own `--offsets codex` file — so just handle the output and **run the same command again**. It prints records as tagged lines:
+
+    T|<session-dir>|<json-record>   a transcriptions.jsonl record
+    E|<session-dir>|<json-record>   an events.jsonl record
 
 ## Handling each batch
 
-Whenever a batch flushes, log every transcription record and interesting events (especially user joined/left, but NOT user started/stopped sending audio) as a dot-line:
+On each live batch, log every record from transcriptions and interesting records from events (especially user joined/left, but NOT user started/stopped sending audio) as a dot-line:
 
     · HH:MM:SS <speaker_or_event>: <text-or-category>
 
-If a record addresses you by name (see Wake words), also respond conversationally to that turn — the other records in the batch still get their dot-line. On `recording_stopped`, add a checkpoint summary. On `call_ended`, write a final summary, after which you may stop the watch and end your turn. Summaries are bulleted decisions, action items (with owner when named), and open threads. No preamble.
+Stay silent when there's nothing to report: if a run ever returns no records — you interrupted it while it was waiting, or it was cut short — don't announce that you're still watching or that nothing flushed. Say nothing and run the watcher again. Only produce output to log records, answer a wake, or write a summary.
+
+If a transcript record addresses you by name (see Wake words), respond conversationally to that turn — the other records in the batch still get their dot-line. On `recording_stopped`, add a checkpoint summary. On `call_ended`, write a final summary, after which you may stop re-running the watcher and end your turn. Summaries are bulleted decisions, action items (with owner when named), and open threads. No preamble.
 
 ## Wake words
 
-A line addresses you when "Codex" appears as a vocative — at the start of an utterance ("Codex, ..."), after a greeting ("hey Codex"), or as a direct question ("Codex, can you ..."). Incidental mentions like "Codex is great" aren't wakes. When ambiguous, prefer the dot-line log; a missed wake is cheaper than a false one. Respond to the addressed turn only.
+A line addresses you when "Codex" appears as a vocative — at the start of an utterance ("Codex, ..."), after a greeting ("hey Codex"), or as a direct question ("Codex, can you ..."). Incidental mentions like "Codex is great" aren't wakes. When ambiguous, prefer the dot-line log; a missed wake is cheaper than a false one. Respond to the addressed turn only; other records in the same batch still get their dot-line.
 
-## Terminal input never stops the watch
+## Terminal input
 
-The user can type directly into this terminal — to address you or ask a question. Because your watcher is a foreground loop, check for typed input once per loop iteration (between rescans) rather than blocking on it. Treat any message as one event among many: reply, then immediately resume the loop. Don't sit idle waiting for the next user line, and don't let handling input end your turn — the call is still happening even when the user is typing.
+The user may type to you directly at this terminal; their message reaches you through Codex (not the watcher), between watcher runs. Reply, then go back to running the watcher. Never end your turn to wait for input; the call continues whether or not the user is typing.
 
-Catch up on the active session, then start the foreground watch loop and keep it running — do not end your turn until `call_ended` (or the user tells you to stop).
+To start: catch up first (`--catchup` + a brief summary), then loop the `--exit-on-batch` watcher and keep it going; do not end your turn until `call_ended` (or the user tells you to stop).
+
+## Following later calls (only if asked)
+
+Your focus is this call, but the transcripts root holds every call. If the user asks you to keep going past it — to follow them into their next call — watch the root for a new `<timestamp>@<call-id>` directory whose call-id differs from this one's (`__CALLID__`). When one appears, catch up on it and loop it exactly as you did here, passing its call-id as the last argument:
+
+    ./__SESSIONDIR__/tuple-call-watcher.py --catchup --offsets codex <new-call-id>      # catch up
+    ./__SESSIONDIR__/tuple-call-watcher.py --exit-on-batch --offsets codex <new-call-id>  # then loop live
+
+The script lives in this call's dir but follows whatever call-id you pass; its offset files live in the target call's dirs, so reusing `--offsets codex` across calls is fine. Don't do this unless the user asks.
 PROMPT
-} > "${PROMPT_FILE}"
+# bash 3.2 (macOS default) mangles heredocs inside $()/`` so the prompt is
+# written straight to a file, then placeholders are substituted with sed.
+sed -e "s|__SESSIONDIR__|${SESSION_DIR}|g" -e "s|__CALLID__|${CALL_ID}|g" "${PROMPT_FILE}.tmpl" > "${PROMPT_FILE}"
+rm -f "${PROMPT_FILE}.tmpl"
 
 cat > "${LAUNCHER_FILE}" <<'SCRIPT'
 #!/bin/zsh -li
@@ -115,7 +139,7 @@ PID_FILE="${SCRIPT_DIR}/codex-sidekick.pid"
 PROMPT_FILE="${SCRIPT_DIR}/codex-sidekick-prompt.md"
 
 echo $$ > "${PID_FILE}"
-cd "${SCRIPT_DIR}" || exit 1
+cd "${SCRIPT_DIR}/.." || exit 1
 
 if ! command -v codex >/dev/null 2>&1; then
     echo "Codex was not found on your interactive shell PATH."
@@ -124,72 +148,45 @@ if ! command -v codex >/dev/null 2>&1; then
     read '?Press return to close.'
     exit 127
 fi
+if ! command -v python3 >/dev/null 2>&1; then
+    echo "The Tuple watcher needs python3 (install Xcode Command Line Tools: xcode-select --install)."
+    echo
+    read '?Press return to close.'
+    exit 127
+fi
 
+# workspace-write (not read-only): the watcher persists its per-session
+# .tuple-watcher-offsets file under the transcripts root between --exit-on-batch
+# runs; read-only silently fails that write, so every re-run replays the whole
+# backlog instead of resuming. on-failure (not never): sandboxed commands run
+# without prompting so the watcher loop stays unattended, but Codex still pauses
+# to ask before anything that fails and wants out of the workspace sandbox (e.g.
+# network) — the approval gate stays in place, just not on every watcher run.
 exec codex \
-    --cd "${SCRIPT_DIR}" \
-    --ask-for-approval untrusted \
-    --sandbox read-only \
+    --cd "${SCRIPT_DIR}/.." \
+    --ask-for-approval on-failure \
+    --sandbox workspace-write \
     -- "$(cat "${PROMPT_FILE}")"
 SCRIPT
 chmod 0755 "${LAUNCHER_FILE}"
 
-# --- launch_in_terminal: open the user's preferred terminal directly --------
-# Canonical source: scripts/support/launch-in-terminal.sh. Keep in sync.
+# --- launch_in_terminal: open the .command launcher in the user's terminal ---
+# Uses LaunchServices (`open`) only — no direct binary exec and no AppleScript,
+# so it triggers no macOS accessibility prompt and no stray empty windows.
+# With PREFERRED_TERM empty, the launcher opens in your default handler for
+# .command files (change it in Finder: right-click a .command > Open With >
+# your terminal > Change All). Set PREFERRED_TERM to force one for this trigger.
+# Ghostty, iTerm, and Terminal run an opened .command directly; Alacritty has no
+# document handler, so it is launched with `open -na ... --args -e`.
 launch_in_terminal() {
-    local script="$1"
-    local choice="${PREFERRED_TERM:-}"
-    local order=(ghostty iterm alacritty terminal)
-    local t
-
-    _term_installed() {
-        case "$1" in
-        ghostty) [ -x "/Applications/Ghostty.app/Contents/MacOS/ghostty" ] ;;
-        iterm) [ -d "/Applications/iTerm.app" ] ;;
-        alacritty) [ -x "/Applications/Alacritty.app/Contents/MacOS/alacritty" ] ;;
-        terminal) true ;;
-        *) return 1 ;;
-        esac
-    }
-
-    if [ -n "$choice" ]; then
-        if ! _term_installed "$choice"; then
-            echo "codex-sidekick: PREFERRED_TERM='$choice' is not installed; auto-detecting" >&2
-            choice=""
-        fi
-    fi
-    if [ -z "$choice" ]; then
-        for t in "${order[@]}"; do
-            if _term_installed "$t"; then choice="$t"; break; fi
-        done
-    fi
-    [ -z "$choice" ] && choice="terminal"
-
-    case "$choice" in
-    ghostty) "/Applications/Ghostty.app/Contents/MacOS/ghostty" -e "$script" & ;;
-    alacritty) "/Applications/Alacritty.app/Contents/MacOS/alacritty" -e "$script" & ;;
-    iterm)
-        osascript - "$script" <<'OSA'
-on run argv
-    set scriptPath to item 1 of argv
-    tell application "iTerm"
-        activate
-        set newWindow to (create window with default profile)
-        tell current session of newWindow to write text (quoted form of scriptPath)
-    end tell
-end run
-OSA
-        ;;
-    terminal | *)
-        osascript - "$script" <<'OSA'
-on run argv
-    set scriptPath to item 1 of argv
-    tell application "Terminal"
-        activate
-        do script (quoted form of scriptPath)
-    end tell
-end run
-OSA
-        ;;
+    local file="$1"
+    case "${PREFERRED_TERM:-}" in
+    "") open "$file" ;;
+    ghostty) open -a "Ghostty" "$file" 2>/dev/null || open "$file" ;;
+    iterm) open -a "iTerm" "$file" 2>/dev/null || open "$file" ;;
+    terminal) open -a "Terminal" "$file" 2>/dev/null || open "$file" ;;
+    alacritty) open -na "Alacritty" --args -e "$file" 2>/dev/null || open "$file" ;;
+    *) echo "launch_in_terminal: unknown PREFERRED_TERM='${PREFERRED_TERM}'; using default handler" >&2; open "$file" ;;
     esac
 }
 
