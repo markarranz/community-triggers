@@ -28,6 +28,6 @@ When `call-transcription-complete` fires, Tuple provides `TUPLE_TRIGGER_CALL_ART
 1. Copies the fixed `tuple-call-watcher.py` and writes `codex-summary-prompt.md` into that directory.
 2. Writes an executable `summarize-in-codex.command` wrapper into that directory.
 3. Opens it in your preferred terminal via `open` (Ghostty → iTerm → Alacritty → Terminal; set `PREFERRED_TERM` to choose). No AppleScript, so it triggers no macOS accessibility prompt.
-4. The wrapper starts a login interactive zsh shell, changes into the transcription directory, and runs `codex --sandbox read-only` with the summary prompt.
+4. The wrapper starts a login interactive zsh shell, changes into the transcription directory, and runs `codex --sandbox read-only --ask-for-approval on-failure` with the summary prompt.
 
 For local script testing without opening a terminal, set `CODEX_TRANSCRIPT_SUMMARY_DRY_RUN=1`.

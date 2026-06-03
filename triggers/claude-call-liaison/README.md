@@ -2,7 +2,7 @@
 
 A [Tuple](https://tuple.app) trigger that launches [Claude Code](https://claude.ai/code) on every call to act as your liaison. When the live transcript surfaces concrete, non-private news worth sharing (decisions, ticket updates, project status, launch notes), Claude posts it to your team's chat, ticket tracker, or knowledge base on your behalf. Hard privacy gates keep it silent on personnel, comp, legal, and named-customer or named-employee discussions.
 
-Claude's terminal is visible only to you. Every external post goes out in your name, with your reputation behind it.
+Claude's terminal is visible only to you. Every external post goes out in your name, with your reputation behind it. It reads the call off disk through the bundled watcher, so it needs no `tuple` CLI.
 
 ## What gets posted
 
@@ -33,7 +33,7 @@ When any gate trips, Claude switches to silent mode for the rest of the call, ev
 
 ## Prerequisites
 
-- **macOS.** Opens your preferred terminal — Ghostty, iTerm, Alacritty, or Terminal (set `PREFERRED_TERM` to choose).
+- **macOS.** Opens your preferred terminal (Ghostty, iTerm, Alacritty, or Terminal; set `PREFERRED_TERM` to choose).
 - **Claude Code**: `npm install -g @anthropic-ai/claude-code`
 - **`python3`** (the bundled watcher needs it; install with `xcode-select --install`).
 - **A Whisper model** configured in Tuple for live transcription. Email `support@tuple.app` if you need local recording enabled for your team.
@@ -67,8 +67,8 @@ You're working with [Your Name], [role] at [company]. [One-liner about what they
 ## Posture
 
 - [Default to terse, factual, no exclamation points / emoji unless the channel uses them.]
-- [Other voice/style notes — e.g. "they sign chat posts with their initials rather than their full name".]
-- [What kinds of detail are always private regardless of category — e.g. "any conversation about a specific teammate's performance is gated, full stop".]
+- [Other voice/style notes, e.g. "they sign chat posts with their initials rather than their full name".]
+- [What kinds of detail are always private regardless of category, e.g. "any conversation about a specific teammate's performance is gated, full stop".]
 ```
 
 ### context.md template
@@ -100,7 +100,7 @@ You're working with [Your Name], [role] at [company]. [One-liner about what they
 
 ## Tools
 
-The specific MCP tool names available in this Claude Code session for each destination. Fill in whichever your install has — leave a category out if you don't have that MCP.
+The specific MCP tool names available in this Claude Code session for each destination. Fill in whichever your install has; leave a category out if you don't have that MCP.
 
 - **Team chat — send a message:** `mcp__<your-chat-mcp>__send_message`
 - **Team chat — search channels:** `mcp__<your-chat-mcp>__search_channels`
@@ -127,7 +127,7 @@ When `call-transcription-started` fires, Tuple provides `TUPLE_TRIGGER_CALL_ARTI
 4. Writes a kickoff prompt and an executable `launch-call-liaison.command` wrapper into the directory.
 5. Opens the wrapper in your preferred terminal (Ghostty → iTerm → Alacritty → Terminal; override with `PREFERRED_TERM`) via `open` (LaunchServices). No AppleScript and no direct binary launch, so it triggers no macOS accessibility prompt and no stray windows.
 
-The wrapper starts a login-interactive zsh, changes to the transcripts root, and runs `claude` with the appended system prompt. Claude follows the call with the bundled `tuple-call-watcher.py`, run verbatim — a fixed, deterministic script rather than a poll loop the model re-authors each session. It runs the watcher once via `Bash --catchup` to read the backlog, then `Monitor`s a continuous run for live updates, reading both transcript and lifecycle events off disk as tagged `T|`/`E|` lines. It maps participants from the `user_joined` events.
+The wrapper starts a login-interactive zsh, changes to the transcripts root, and runs `claude` with the appended system prompt. Claude follows the call with the bundled `tuple-call-watcher.py`, run verbatim: a fixed, deterministic script rather than a poll loop the model re-authors each session. It runs the watcher once via `Bash --catchup` to read the backlog, then `Monitor`s a continuous run for live updates, reading both transcript and lifecycle events off disk as tagged `T|`/`E|` lines. It maps participants from the `user_joined` events.
 
 If transcription stops and restarts mid-call (e.g. you toggled it off then back on), the trigger sees the live PID file (`.liaison-<call-id>.pid` in the transcripts root, stable across restarts) and exits. The watcher in the running session follows the new session directory automatically, so the resumed transcript is picked up without restarting.
 

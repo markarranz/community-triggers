@@ -4,7 +4,7 @@ Launches [OpenCode](https://opencode.ai/) in the current Tuple transcription dir
 
 The trigger writes an `open-in-opencode.command` wrapper next to the live transcript files and opens it in your preferred terminal. The wrapper runs as `#!/bin/zsh -li`, so `opencode` is resolved from the same interactive shell environment you get in a new terminal. No install location is hard-coded.
 
-OpenCode follows the call with **Tuple's bundled watcher** (`tuple-call-watcher.py`), shipped with this trigger and run verbatim — a fixed, deterministic script rather than a watch loop the model re-authors each session. Since OpenCode has no event-driven wake, it runs the watcher once with `--catchup`, then repeatedly in `--exit-on-batch` mode. It logs the call live, responds when addressed by name, and writes checkpoint/final summaries around transcription and call lifecycle events.
+OpenCode follows the call with **Tuple's bundled watcher** (`tuple-call-watcher.py`), shipped with this trigger and run verbatim: a fixed, deterministic script rather than a watch loop the model re-authors each session. Since OpenCode has no event-driven wake, it runs the watcher once with `--catchup`, then repeatedly in `--exit-on-batch` mode. It logs the call live, responds when addressed by name, and writes checkpoint and final summaries around transcription and call lifecycle events.
 
 ## Prerequisites
 

@@ -28,6 +28,6 @@ When `call-transcription-complete` fires, Tuple provides `TUPLE_TRIGGER_CALL_ART
 1. Copies the fixed `tuple-call-watcher.py` and writes `claude-summary-prompt.md` into that directory.
 2. Writes an executable `summarize-in-claude.command` wrapper into that directory.
 3. Opens it in your preferred terminal via `open` (Ghostty → iTerm → Alacritty → Terminal; set `PREFERRED_TERM` to choose). No AppleScript, so it triggers no macOS accessibility prompt.
-4. The wrapper starts a login interactive zsh shell, changes into the transcription directory, and runs `claude --name "Tuple Transcript Summary" -- "$(cat claude-summary-prompt.md)"`.
+4. The wrapper starts a login interactive zsh shell, changes into the transcription directory, and runs `claude --allowed-tools Read Bash --name "Tuple Transcript Summary" -- "$(cat claude-summary-prompt.md)"`.
 
 For local script testing without opening a terminal, set `CLAUDE_TRANSCRIPT_SUMMARY_DRY_RUN=1`.

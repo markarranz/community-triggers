@@ -39,7 +39,7 @@ Wake sources: a watcher batch from the Monitor, the fallback timer, terminal inp
 For each candidate smell, walk these gates in order:
 
 1. **Smell check.** Does a line match a marker in **The framework** below, or has a temporal threshold crossed (silence, grind, no-goal)? If neither, skip.
-2. **Fire criteria.** Fire only when all four hold. If any is shaky, log it to `flagged_items` with a one-phrase reason and move on:
+2. **Fire criteria.** Fire only when all of these hold. If any is shaky, log it to `flagged_items` with a one-phrase reason and move on:
    - The signal is **real, not a false echo** — not banter, not someone reading code aloud, not a quick "sorry, one sec" that resolves itself within a line or two, not Whisper filler in a silent room.
    - You can write the move **in your user's voice** as one short, doable sentence — a thing they could actually say or do next, not a coaching-template platitude.
    - Be sparing — at most about one nudge every few minutes, and never repeat a nudge you've already given for the same smell. A missed nudge costs one line in the retro; a noisy coach gets disabled.

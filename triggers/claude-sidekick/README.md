@@ -11,7 +11,7 @@ When `call-transcription-started` fires, this trigger opens your preferred termi
 - **Answers when addressed.** Say "Claude, ..." (or type into the terminal) and it responds to that turn, then keeps listening.
 - **Summarizes.** It writes a checkpoint summary when recording stops and a final summary (decisions, action items, open threads) when the call ends.
 
-Claude follows the call with **Tuple's bundled watcher** (`tuple-call-watcher.py`), shipped with this trigger and run verbatim — a fixed, deterministic script rather than a poll loop the model re-authors each session. Claude runs it once via `Bash --catchup` to read the backlog, then `Monitor`s a continuous run for live updates. It runs with `--allowed-tools Read Bash Monitor`.
+Claude follows the call with **Tuple's bundled watcher** (`tuple-call-watcher.py`), shipped with this trigger and run verbatim: a fixed, deterministic script rather than a poll loop the model re-authors each session. Claude runs it once via `Bash --catchup` to read the backlog, then `Monitor`s a continuous run for live updates. It launches with `claude --allowed-tools Read Bash Monitor --name "Tuple Claude Sidekick"`.
 
 ## Choosing your terminal
 
@@ -45,7 +45,7 @@ When `call-transcription-started` fires, Tuple provides `TUPLE_TRIGGER_CALL_ARTI
 1. Copies the fixed `tuple-call-watcher.py` and writes `claude-sidekick-prompt.md` into that directory.
 2. Writes an executable `launch-claude-sidekick.command` wrapper into that directory.
 3. Opens it in your preferred terminal via `open` (LaunchServices). No AppleScript and no direct binary launch, so it triggers no macOS accessibility prompt and no stray windows.
-4. The wrapper starts a login-interactive zsh, changes to the transcripts root, and runs `claude` with the prompt; Claude runs the bundled watcher to catch up and follow the call.
+4. The wrapper starts a login-interactive zsh, changes to the transcripts root, and runs `claude` with the prompt. Claude runs the bundled watcher to catch up and follow the call.
 
 A PID file (`claude-sidekick.pid`) keeps a second transcription start from launching a duplicate sidekick for the same call.
 
