@@ -32,7 +32,26 @@ Two things to expect on first launch:
 - **Directory trust.** Cursor asks once whether you trust the transcripts directory. Accept it to proceed (this is separate from command approval).
 - **Approval mode.** Whether allowlisted commands run silently depends on your global Cursor approval mode (`~/.cursor/cli-config.json`). With the default allowlist mode the watcher runs unattended; if your mode prompts for everything, approve the watcher once with "don't ask again."
 
-If you'd rather run with Cursor's blanket auto-approve anyway, export `CURSOR_SIDEKICK_FORCE=1` in your shell profile before the trigger fires (off by default).
+## MCP servers and plugins
+
+The `cursor-agent` CLI loads MCP servers **only** from `~/.cursor/mcp.json` (global) and the workspace's `.cursor/mcp.json` (project, wins on conflict). It does **not** load the MCP servers that Cursor *IDE plugins* install — those live in each plugin's own manifest and are an IDE-only feature.
+
+If your team ships approved/whitelisted MCPs as Cursor plugins (a common lockdown pattern), point the sidekick at those plugin directories and it will harvest their servers into the session's `.cursor/mcp.json`, which the CLI does read. Configure with these env vars (export in your shell profile; all off by default):
+
+| Variable | Effect |
+| --- | --- |
+| `CURSOR_SIDEKICK_PLUGIN_DIRS` | Newline- or colon-separated Cursor plugin directories. For each, the trigger reads its `mcpServers` (from `.cursor-plugin/plugin.json`, `plugin.json`, or `.mcp.json`) and merges them into the session's `.cursor/mcp.json`. Your plugins stay the source of truth for what's approved; existing entries are preserved. |
+| `CURSOR_SIDEKICK_APPROVE_MCPS=1` | Adds `--approve-mcps` so those servers start without an approval prompt stalling the hands-free loop. |
+| `CURSOR_SIDEKICK_EXTRA_ARGS` | Any other `cursor-agent` flags, shell-quoted (e.g. `--model gpt-5.2`). |
+
+Example:
+
+```bash
+export CURSOR_SIDEKICK_PLUGIN_DIRS="$HOME/.cursor/plugins/cache/stash-plugins/stash/<key>"
+export CURSOR_SIDEKICK_APPROVE_MCPS=1
+```
+
+(If you'd rather manage MCP servers directly, just maintain `~/.cursor/mcp.json` — the CLI reads it everywhere, including the sidekick, with no env vars needed.)
 
 ## Choosing your terminal
 

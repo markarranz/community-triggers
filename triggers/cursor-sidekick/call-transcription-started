@@ -200,12 +200,74 @@ fi
 # exits, and Cursor hands the turn back. The prompt is passed as the initial
 # message; with no -p flag Cursor stays interactive so you can type to it.
 #
-# Opt in to Cursor's blanket auto-approve (allow every command unless explicitly
-# denied) by exporting CURSOR_SIDEKICK_FORCE=1 in your shell profile; off by
-# default.
+# Optional passthrough knobs (export in your shell profile; all off by default):
+#   CURSOR_SIDEKICK_PLUGIN_DIRS    newline- or colon-separated Cursor plugin
+#                                  directories whose approved MCP servers should be
+#                                  available to the sidekick. The cursor-agent CLI
+#                                  reads MCP servers only from .cursor/mcp.json
+#                                  (this workspace) and ~/.cursor/mcp.json — it
+#                                  does NOT load the servers that IDE plugins
+#                                  install. So for each dir we harvest its
+#                                  mcpServers (from .cursor-plugin/plugin.json,
+#                                  plugin.json, or .mcp.json) and merge them into
+#                                  this workspace's .cursor/mcp.json, leaving your
+#                                  plugins as the source of truth for what's
+#                                  approved. Existing entries are kept.
+#   CURSOR_SIDEKICK_APPROVE_MCPS=1 add --approve-mcps so those servers start
+#                                  without an approval prompt stalling the
+#                                  hands-free loop.
+#   CURSOR_SIDEKICK_EXTRA_ARGS     any other cursor-agent flags, shell-quoted
+#                                  (e.g. '--model gpt-5.2').
 CURSOR_FLAGS=()
-if [ "${CURSOR_SIDEKICK_FORCE:-}" = "1" ]; then
-    CURSOR_FLAGS+=(--force)
+if [ -n "${CURSOR_SIDEKICK_PLUGIN_DIRS:-}" ]; then
+    # Accept newline- or colon-separated dirs: normalize newlines to colons, then
+    # split once on colons (empties dropped; spaces inside a path preserved).
+    _plugin_raw=${CURSOR_SIDEKICK_PLUGIN_DIRS//$'\n'/:}
+    _plugin_dirs=(${(s.:.)_plugin_raw})
+    if [ ${#_plugin_dirs} -gt 0 ]; then
+        # cwd is the transcripts root, so .cursor/mcp.json is this session's
+        # workspace config. Harvest is best-effort: any failure just leaves the
+        # sidekick running without the merged servers rather than blocking launch.
+        python3 - .cursor/mcp.json "${_plugin_dirs[@]}" <<'PY' || true
+import json, os, sys
+out_path, *dirs = sys.argv[1:]
+merged = {}
+if os.path.exists(out_path):
+    try:
+        merged = (json.load(open(out_path)) or {}).get("mcpServers", {}) or {}
+    except Exception:
+        merged = {}
+for d in dirs:
+    if not d:
+        continue
+    for cand in (".cursor-plugin/plugin.json", "plugin.json", ".mcp.json"):
+        p = os.path.join(d, cand)
+        if not os.path.exists(p):
+            continue
+        try:
+            data = json.load(open(p)) or {}
+        except Exception:
+            break
+        servers = data.get("mcpServers") if isinstance(data.get("mcpServers"), dict) \
+            else (data if cand == ".mcp.json" and isinstance(data, dict) else {})
+        for name, cfg in (servers or {}).items():
+            merged.setdefault(name, cfg)
+        break
+    else:
+        sys.stderr.write("cursor-sidekick: no plugin manifest with mcpServers in %s\n" % d)
+os.makedirs(os.path.dirname(out_path) or ".", exist_ok=True)
+with open(out_path, "w") as fh:
+    json.dump({"mcpServers": merged}, fh, indent=2)
+sys.stderr.write("cursor-sidekick: %d MCP server(s) available via %s\n"
+                 % (len(merged), os.path.abspath(out_path)))
+PY
+    fi
+fi
+if [ "${CURSOR_SIDEKICK_APPROVE_MCPS:-}" = "1" ]; then
+    CURSOR_FLAGS+=(--approve-mcps)
+fi
+if [ -n "${CURSOR_SIDEKICK_EXTRA_ARGS:-}" ]; then
+    CURSOR_FLAGS+=(${(z)CURSOR_SIDEKICK_EXTRA_ARGS})
 fi
 exec cursor-agent "${CURSOR_FLAGS[@]}" "$(cat "${PROMPT_FILE}")"
 SCRIPT
