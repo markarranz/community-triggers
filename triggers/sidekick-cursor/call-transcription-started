@@ -10,20 +10,20 @@ PREFERRED_TERM="${PREFERRED_TERM:-}"
 
 LOG=/tmp/tuple-trigger-debug.log
 {
-    printf '\n=== %s call-transcription-started fired (cursor-sidekick) ===\n' "$(date -u +%FT%TZ)"
+    printf '\n=== %s call-transcription-started fired (sidekick-cursor) ===\n' "$(date -u +%FT%TZ)"
     printf 'cwd=%s pid=%s ppid=%s\n' "$(pwd)" "$$" "$PPID"
 } >> "$LOG" 2>&1
 trap 'printf "exit status=%s on line %s\n" "$?" "$LINENO" >> "$LOG"' EXIT
 exec >>"$LOG" 2>&1
 
 if [ -z "${TUPLE_TRIGGER_CALL_ARTIFACTS_DIRECTORY:-}" ]; then
-    echo "cursor-sidekick: TUPLE_TRIGGER_CALL_ARTIFACTS_DIRECTORY was not set" >&2
+    echo "sidekick-cursor: TUPLE_TRIGGER_CALL_ARTIFACTS_DIRECTORY was not set" >&2
     exit 1
 fi
 
 TRANSCRIPTION_DIR="${TUPLE_TRIGGER_CALL_ARTIFACTS_DIRECTORY}"
 if [ ! -d "${TRANSCRIPTION_DIR}" ]; then
-    echo "cursor-sidekick: transcription directory does not exist: ${TRANSCRIPTION_DIR}" >&2
+    echo "sidekick-cursor: transcription directory does not exist: ${TRANSCRIPTION_DIR}" >&2
     exit 1
 fi
 
@@ -38,15 +38,15 @@ else
     CALL_ID="${SESSION_DIR}"
 fi
 
-PID_FILE="${TRANSCRIPTION_DIR}/cursor-sidekick.pid"
-PROMPT_FILE="${TRANSCRIPTION_DIR}/cursor-sidekick-prompt.md"
-LAUNCHER_FILE="${TRANSCRIPTION_DIR}/launch-cursor-sidekick.command"
+PID_FILE="${TRANSCRIPTION_DIR}/sidekick-cursor.pid"
+PROMPT_FILE="${TRANSCRIPTION_DIR}/sidekick-cursor-prompt.md"
+LAUNCHER_FILE="${TRANSCRIPTION_DIR}/launch-sidekick-cursor.command"
 TRIGGER_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 WATCHER_SRC="${TRIGGER_DIR}/tuple-call-watcher.py"
 WATCHER_DST="${TRANSCRIPTION_DIR}/tuple-call-watcher.py"
 
 if [ -f "${PID_FILE}" ] && kill -0 "$(cat "${PID_FILE}" 2>/dev/null)" 2>/dev/null; then
-    echo "cursor-sidekick: Cursor sidekick already running for ${TRANSCRIPTION_DIR}"
+    echo "sidekick-cursor: Cursor sidekick already running for ${TRANSCRIPTION_DIR}"
     exit 0
 fi
 
@@ -56,7 +56,7 @@ if [ -f "${WATCHER_SRC}" ]; then
     cp "${WATCHER_SRC}" "${WATCHER_DST}"
     chmod 0755 "${WATCHER_DST}"
 else
-    echo "cursor-sidekick: watcher not found at ${WATCHER_SRC}" >&2
+    echo "sidekick-cursor: watcher not found at ${WATCHER_SRC}" >&2
     exit 1
 fi
 
@@ -83,9 +83,9 @@ if [ ! -e "${CURSOR_CONFIG_FILE}" ]; then
   }
 }
 JSON
-    echo "cursor-sidekick: wrote scoped watcher allowlist to ${CURSOR_CONFIG_FILE}"
+    echo "sidekick-cursor: wrote scoped watcher allowlist to ${CURSOR_CONFIG_FILE}"
 else
-    echo "cursor-sidekick: ${CURSOR_CONFIG_FILE} already exists; leaving the user's Cursor permissions untouched"
+    echo "sidekick-cursor: ${CURSOR_CONFIG_FILE} already exists; leaving the user's Cursor permissions untouched"
 fi
 
 cat > "${PROMPT_FILE}.tmpl" <<'PROMPT'
@@ -159,14 +159,14 @@ rm -f "${PROMPT_FILE}.tmpl"
 
 cat > "${LAUNCHER_FILE}" <<'SCRIPT'
 #!/bin/zsh -li
-printf '\e]0;Tuple Cursor Sidekick\a'
+printf '\e]0;Tuple Sidekick - Cursor\a'
 clear
 echo 'Starting Cursor sidekick…'
 echo
 
 SCRIPT_DIR="${0:A:h}"
-PID_FILE="${SCRIPT_DIR}/cursor-sidekick.pid"
-PROMPT_FILE="${SCRIPT_DIR}/cursor-sidekick-prompt.md"
+PID_FILE="${SCRIPT_DIR}/sidekick-cursor.pid"
+PROMPT_FILE="${SCRIPT_DIR}/sidekick-cursor-prompt.md"
 
 echo $$ > "${PID_FILE}"
 # cwd = the transcripts root (parent of this call's session dir) so the watcher
@@ -201,7 +201,7 @@ fi
 # message; with no -p flag Cursor stays interactive so you can type to it.
 #
 # Optional passthrough knobs (export in your shell profile; all off by default):
-#   CURSOR_SIDEKICK_PLUGIN_DIRS    newline- or colon-separated Cursor plugin
+#   SIDEKICK_CURSOR_PLUGIN_DIRS    newline- or colon-separated Cursor plugin
 #                                  directories whose approved MCP servers should be
 #                                  available to the sidekick. The cursor-agent CLI
 #                                  reads MCP servers only from .cursor/mcp.json
@@ -213,16 +213,16 @@ fi
 #                                  this workspace's .cursor/mcp.json, leaving your
 #                                  plugins as the source of truth for what's
 #                                  approved. Existing entries are kept.
-#   CURSOR_SIDEKICK_APPROVE_MCPS=1 add --approve-mcps so those servers start
+#   SIDEKICK_CURSOR_APPROVE_MCPS=1 add --approve-mcps so those servers start
 #                                  without an approval prompt stalling the
 #                                  hands-free loop.
-#   CURSOR_SIDEKICK_EXTRA_ARGS     any other cursor-agent flags, shell-quoted
+#   SIDEKICK_CURSOR_EXTRA_ARGS     any other cursor-agent flags, shell-quoted
 #                                  (e.g. '--model gpt-5.2').
 CURSOR_FLAGS=()
-if [ -n "${CURSOR_SIDEKICK_PLUGIN_DIRS:-}" ]; then
+if [ -n "${SIDEKICK_CURSOR_PLUGIN_DIRS:-}" ]; then
     # Accept newline- or colon-separated dirs: normalize newlines to colons, then
     # split once on colons (empties dropped; spaces inside a path preserved).
-    _plugin_raw=${CURSOR_SIDEKICK_PLUGIN_DIRS//$'\n'/:}
+    _plugin_raw=${SIDEKICK_CURSOR_PLUGIN_DIRS//$'\n'/:}
     _plugin_dirs=(${(s.:.)_plugin_raw})
     if [ ${#_plugin_dirs} -gt 0 ]; then
         # cwd is the transcripts root, so .cursor/mcp.json is this session's
@@ -254,20 +254,20 @@ for d in dirs:
             merged.setdefault(name, cfg)
         break
     else:
-        sys.stderr.write("cursor-sidekick: no plugin manifest with mcpServers in %s\n" % d)
+        sys.stderr.write("sidekick-cursor: no plugin manifest with mcpServers in %s\n" % d)
 os.makedirs(os.path.dirname(out_path) or ".", exist_ok=True)
 with open(out_path, "w") as fh:
     json.dump({"mcpServers": merged}, fh, indent=2)
-sys.stderr.write("cursor-sidekick: %d MCP server(s) available via %s\n"
+sys.stderr.write("sidekick-cursor: %d MCP server(s) available via %s\n"
                  % (len(merged), os.path.abspath(out_path)))
 PY
     fi
 fi
-if [ "${CURSOR_SIDEKICK_APPROVE_MCPS:-}" = "1" ]; then
+if [ "${SIDEKICK_CURSOR_APPROVE_MCPS:-}" = "1" ]; then
     CURSOR_FLAGS+=(--approve-mcps)
 fi
-if [ -n "${CURSOR_SIDEKICK_EXTRA_ARGS:-}" ]; then
-    CURSOR_FLAGS+=(${(z)CURSOR_SIDEKICK_EXTRA_ARGS})
+if [ -n "${SIDEKICK_CURSOR_EXTRA_ARGS:-}" ]; then
+    CURSOR_FLAGS+=(${(z)SIDEKICK_CURSOR_EXTRA_ARGS})
 fi
 exec cursor-agent "${CURSOR_FLAGS[@]}" "$(cat "${PROMPT_FILE}")"
 SCRIPT
@@ -293,8 +293,8 @@ launch_in_terminal() {
     esac
 }
 
-if [ "${CURSOR_SIDEKICK_DRY_RUN:-}" = "1" ]; then
-    echo "cursor-sidekick: dry run generated ${LAUNCHER_FILE}"
+if [ "${SIDEKICK_CURSOR_DRY_RUN:-}" = "1" ]; then
+    echo "sidekick-cursor: dry run generated ${LAUNCHER_FILE}"
     exit 0
 fi
 

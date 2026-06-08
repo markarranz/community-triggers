@@ -1,4 +1,4 @@
-# Cursor Sidekick
+# Sidekick - Cursor
 
 Launches the [Cursor CLI agent](https://cursor.com/cli) as a live companion on your Tuple call when transcription starts.
 
@@ -42,15 +42,15 @@ If your team ships approved/whitelisted MCPs as Cursor plugins (a common lockdow
 
 | Variable | Effect |
 | --- | --- |
-| `CURSOR_SIDEKICK_PLUGIN_DIRS` | Newline- or colon-separated Cursor plugin directories. For each, the trigger reads its `mcpServers` (from `.cursor-plugin/plugin.json`, `plugin.json`, or `.mcp.json`) and merges them into the session's `.cursor/mcp.json`. Your plugins stay the source of truth for what's approved; existing entries are preserved. |
-| `CURSOR_SIDEKICK_APPROVE_MCPS=1` | Adds `--approve-mcps` so those servers start without an approval prompt stalling the hands-free loop. |
-| `CURSOR_SIDEKICK_EXTRA_ARGS` | Any other `cursor-agent` flags, shell-quoted (e.g. `--model gpt-5.2`). |
+| `SIDEKICK_CURSOR_PLUGIN_DIRS` | Newline- or colon-separated Cursor plugin directories. For each, the trigger reads its `mcpServers` (from `.cursor-plugin/plugin.json`, `plugin.json`, or `.mcp.json`) and merges them into the session's `.cursor/mcp.json`. Your plugins stay the source of truth for what's approved; existing entries are preserved. |
+| `SIDEKICK_CURSOR_APPROVE_MCPS=1` | Adds `--approve-mcps` so those servers start without an approval prompt stalling the hands-free loop. |
+| `SIDEKICK_CURSOR_EXTRA_ARGS` | Any other `cursor-agent` flags, shell-quoted (e.g. `--model gpt-5.2`). |
 
 Example:
 
 ```bash
-export CURSOR_SIDEKICK_PLUGIN_DIRS="$HOME/.cursor/plugins/cache/stash-plugins/stash/<key>"
-export CURSOR_SIDEKICK_APPROVE_MCPS=1
+export SIDEKICK_CURSOR_PLUGIN_DIRS="$HOME/.cursor/plugins/cache/stash-plugins/stash/<key>"
+export SIDEKICK_CURSOR_APPROVE_MCPS=1
 ```
 
 (If you'd rather manage MCP servers directly, just maintain `~/.cursor/mcp.json` — the CLI reads it everywhere, including the sidekick, with no env vars needed.)
@@ -63,7 +63,7 @@ By default the trigger opens the first installed of **Ghostty → iTerm → Alac
 PREFERRED_TERM="iterm"   # ghostty | iterm | alacritty | terminal
 ```
 
-The terminal runs `launch-cursor-sidekick.command`, whose `#!/bin/zsh -li` shebang sources your `~/.zprofile` and `~/.zshrc`, so `cursor-agent` resolves from the same PATH and environment you get in a normal terminal.
+The terminal runs `launch-sidekick-cursor.command`, whose `#!/bin/zsh -li` shebang sources your `~/.zprofile` and `~/.zshrc`, so `cursor-agent` resolves from the same PATH and environment you get in a normal terminal.
 
 ## Prerequisites
 
@@ -76,7 +76,7 @@ The terminal runs `launch-cursor-sidekick.command`, whose `#!/bin/zsh -li` sheba
 
 Drop this directory into your Tuple triggers folder:
 
-`~/.tuple/triggers/cursor-sidekick/`
+`~/.tuple/triggers/sidekick-cursor/`
 
 The trigger fires the next time call transcription starts.
 
@@ -84,9 +84,11 @@ The trigger fires the next time call transcription starts.
 
 When `call-transcription-started` fires, Tuple provides `TUPLE_TRIGGER_CALL_ARTIFACTS_DIRECTORY`, the directory containing the current call transcription artifacts. This trigger:
 
-1. Copies the fixed `tuple-call-watcher.py` and writes `cursor-sidekick-prompt.md` into that directory.
-2. Writes an executable `launch-cursor-sidekick.command` wrapper into that directory.
+1. Copies the fixed `tuple-call-watcher.py` and writes `sidekick-cursor-prompt.md` into that directory.
+2. Writes an executable `launch-sidekick-cursor.command` wrapper into that directory.
 3. Opens it in your preferred terminal via `open` (Ghostty → iTerm → Alacritty → Terminal; set `PREFERRED_TERM` to choose). No AppleScript, so it triggers no macOS accessibility prompt.
-4. The wrapper starts a login-interactive zsh shell, changes to the transcripts root, and runs `cursor-agent --force "$(cat cursor-sidekick-prompt.md)"`; Cursor runs the bundled watcher to catch up and follow the call.
+4. The wrapper starts a login-interactive zsh shell, changes to the transcripts root, and runs `cursor-agent` with the prompt as its initial message (no `--force` — see Permissions); Cursor runs the bundled watcher to catch up and follow the call.
 
-For local script testing without opening a terminal, set `CURSOR_SIDEKICK_DRY_RUN=1`. It still ships the watcher and writes the launcher so you can inspect them.
+A PID file (`sidekick-cursor.pid`) keeps a second transcription start from launching a duplicate sidekick for the same call.
+
+For local script testing without opening a terminal, set `SIDEKICK_CURSOR_DRY_RUN=1`. It still ships the watcher and writes the launcher so you can inspect them.
