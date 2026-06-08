@@ -36,6 +36,8 @@ Two things to expect on first launch:
 
 The `cursor-agent` CLI loads MCP servers **only** from `~/.cursor/mcp.json` (global) and the workspace's `.cursor/mcp.json` (project, wins on conflict). It does **not** load the MCP servers that Cursor *IDE plugins* install — those live in each plugin's own manifest and are an IDE-only feature.
 
+This is per Cursor's own docs: the global path is `~/.cursor/mcp.json` ("tools available everywhere") and the project path is `.cursor/mcp.json` ("project-specific tools") ([MCP config](https://cursor.com/docs/context/mcp)), and the CLI "follows the same configuration precedence as the editor (project → global → nested)" ([CLI MCP](https://cursor.com/docs/cli/mcp)). Plugin-installed MCP servers are not among those documented sources — and in practice they don't show up in `cursor-agent mcp list` (also reported in the community: [CLI does not detect MCP settings](https://forum.cursor.com/t/cursor-cli-does-not-detect-mcp-settings/148397)).
+
 If your team ships approved/whitelisted MCPs as Cursor plugins (a common lockdown pattern), point the sidekick at those plugin directories and it will harvest their servers into the session's `.cursor/mcp.json`, which the CLI does read. Configure with these env vars (export in your shell profile; all off by default):
 
 | Variable | Effect |
