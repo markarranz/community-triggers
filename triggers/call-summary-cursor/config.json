@@ -1,0 +1,7 @@
+{
+  "name": "Call Summary - Cursor",
+  "description": "Launches the Cursor CLI agent when Tuple transcription completes and asks it to summarize the completed transcript.",
+  "category": "Call Summary",
+  "platforms": ["macos"],
+  "language": "bash"
+}
