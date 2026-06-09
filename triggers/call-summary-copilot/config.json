@@ -1,0 +1,7 @@
+{
+  "name": "Call Summary - Copilot",
+  "description": "Launches GitHub Copilot CLI when Tuple transcription completes and asks it to summarize the completed transcript.",
+  "category": "Call Summary",
+  "platforms": ["macos"],
+  "language": "bash"
+}
