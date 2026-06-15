@@ -1,33 +1,31 @@
 # Call Summary - Claude Cowork
 
-A [Tuple](https://tuple.app) trigger that opens [Claude Cowork](https://www.anthropic.com/product/claude-cowork) when call transcription completes and preloads a summary prompt against the call's raw transcript artifacts.
+A [Tuple](https://tuple.app) trigger that opens [Claude Cowork](https://www.anthropic.com/product/claude-cowork) when call transcription completes, preloaded with a prompt to summarize the call.
 
 ## What it does
 
-When `call-transcription-complete` fires, the trigger:
+When `call-transcription-complete` fires, the trigger opens `claude://cowork/new` with a summary prompt. Cowork (which has access to the `tuple` CLI through the desktop app) then:
 
-- Finds the transcription artifact directory from `TUPLE_TRIGGER_CALL_ARTIFACTS_DIRECTORY`.
-- Verifies at least one `transcriptions.jsonl` exists.
-- Opens `claude://cowork/new` with that artifact directory attached as a folder.
-- Prefills a prompt asking Cowork to summarize the call and write `call-summary.md` into the same artifact directory.
+- Finds the call — `tuple call current` if you're still on it, otherwise the most recent call from `tuple transcription list`.
+- Reads the transcript — `tuple transcription show <id>` (with `--with-events` for join/leave/screen events).
+- Produces an executive summary, decisions, action items, open questions, and a follow-up draft.
+- Writes a title and summary back onto the call — `tuple transcription set-title` / `set-summary` — so they show up in Tuple's Call History.
 
-Claude Cowork opens with a draft prompt. Review it, confirm folder access if prompted, and press Enter to run the summary.
-
-The prompt asks for an executive summary, decisions, action items, open questions, and a follow-up message draft when useful. If transcription stopped while the call still appears to be ongoing, Cowork is instructed to call that out and summarize the conversation so far.
+Claude Cowork opens with the draft prompt; review it and press Enter to run.
 
 ## Requirements
 
-- macOS.
-- Claude Desktop with Cowork enabled.
-- Tuple transcription enabled for the call.
-
-Claude Desktop may ask you to confirm access to the attached call artifact folder before Cowork can read or write files there.
+- macOS
+- Claude Desktop with Cowork enabled
+- The `tuple` CLI available to the desktop app (with `transcription` support)
+- Tuple transcription enabled for the call
 
 ## Installation
 
 Drop this directory into your Tuple triggers folder:
 
-- Production: `~/.tuple/triggers/call-summary-claude-cowork/`
-- Staging: `~/.tuplestaging/triggers/call-summary-claude-cowork/`
+`~/.tuple/triggers/call-summary-claude-cowork/`
 
 The trigger fires automatically the next time call transcription completes.
+
+For local testing without opening Cowork, set `CALL_SUMMARY_COWORK_DRY_RUN=1`; the trigger prints the deep-link it would open and exits.
