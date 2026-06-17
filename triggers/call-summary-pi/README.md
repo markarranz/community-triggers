@@ -21,6 +21,7 @@ Nothing is hard-coded about the model — Pi uses whichever provider and model y
 - macOS
 - [Pi](https://pi.ai/) installed so `pi` works in a new terminal, with a provider authenticated (`pi`, then `/login`)
 - The `tuple` CLI on your interactive shell PATH (with `transcription` support)
+  - Install it from the Tuple app: its Transcription settings have an **Install** button that links `tuple` onto your PATH.
 - Tuple transcription enabled for the call
 
 ## Installation

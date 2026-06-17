@@ -30,6 +30,7 @@ The terminal runs `launch-sidekick-cursor.command`, whose `#!/bin/zsh -li` sheba
 - macOS
 - [Cursor CLI](https://cursor.com/cli) installed so `cursor-agent` works in a new terminal
 - The `tuple` CLI on your interactive shell PATH (with `connect` and `transcription` support)
+  - Install it from the Tuple app: its Transcription settings have an **Install** button that links `tuple` onto your PATH.
 - Tuple transcription enabled for the call
 
 ## Installation

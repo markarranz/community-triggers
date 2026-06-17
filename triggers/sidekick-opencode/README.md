@@ -1,19 +1,19 @@
-# Sidekick - opencode
+# Sidekick - OpenCode
 
-Launches [opencode](https://opencode.ai/) as a live companion on your Tuple call when transcription starts.
+Launches [OpenCode](https://opencode.ai/) as a live companion on your Tuple call when transcription starts.
 
-When `call-transcription-started` fires, this trigger opens your preferred terminal and runs `tuple connect --harness opencode`. Connect resolves the call state, gives opencode a context prompt, and points it at the live transcript — so opencode catches up on everything said so far, then watches the call as it happens and acts as a sharp third pair.
+When `call-transcription-started` fires, this trigger opens your preferred terminal and runs `tuple connect --harness opencode`. Connect resolves the call state, gives OpenCode a context prompt, and points it at the live transcript — so OpenCode catches up on everything said so far, then watches the call as it happens and acts as a sharp third pair.
 
 ## What it does
 
-`tuple connect` brings opencode into the call and tells it how to follow along, using the `tuple` CLI's own transcript stream (`tuple transcription show --wait`). Guided by connect's prompt, opencode:
+`tuple connect` brings OpenCode into the call and tells it how to follow along, using the `tuple` CLI's own transcript stream (`tuple transcription show --wait`). Guided by connect's prompt, OpenCode:
 
 - **Logs the call live** — a one-line `·` play-by-play on each batch of new transcript, so you can follow along at a glance.
 - **Chimes in when it matters** — a real interjection for a bug it can see, an ambiguous decision or action item, a correction, or a direct question.
-- **Answers when addressed** — say "opencode, ..." (or type into the terminal) and it responds, then keeps listening.
+- **Answers when addressed** — say "OpenCode, ..." (or type into the terminal) and it responds, then keeps listening.
 - **Summarizes** — a checkpoint when recording stops, and a final summary (decisions, action items, open threads) when the call ends.
 
-Because the trigger just hands off to `tuple connect`, there's nothing call-format-specific in it: how opencode reads the call lives in connect's prompt, in the CLI. Nothing is hard-coded about the model either — opencode uses whatever you have configured.
+Because the trigger just hands off to `tuple connect`, there's nothing call-format-specific in it: how OpenCode reads the call lives in connect's prompt, in the CLI. Nothing is hard-coded about the model either — OpenCode uses whatever you have configured.
 
 ## Choosing your terminal
 
@@ -28,8 +28,9 @@ The terminal runs `launch-sidekick-opencode.command`, whose `#!/bin/zsh -li` she
 ## Prerequisites
 
 - macOS
-- [opencode](https://opencode.ai/) installed so `opencode` works in a new terminal
+- [OpenCode](https://opencode.ai/) installed so `opencode` works in a new terminal
 - The `tuple` CLI on your interactive shell PATH (with `connect` and `transcription` support)
+  - Install it from the Tuple app: its Transcription settings have an **Install** button that links `tuple` onto your PATH.
 - Tuple transcription enabled for the call
 
 ## Installation

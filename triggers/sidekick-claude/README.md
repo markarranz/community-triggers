@@ -30,6 +30,7 @@ The terminal runs `launch-sidekick-claude.command`, whose `#!/bin/zsh -li` sheba
 - macOS
 - [Claude Code](https://claude.com/claude-code) installed so `claude` works in a new terminal
 - The `tuple` CLI on your interactive shell PATH (with `connect` and `transcription` support)
+  - Install it from the Tuple app: its Transcription settings have an **Install** button that links `tuple` onto your PATH.
 - Tuple transcription enabled for the call
 
 ## Installation

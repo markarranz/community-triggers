@@ -239,7 +239,7 @@ export default function (pi: ExtensionAPI) {
   // idle (its normal state between batches) and queues behind the user's own turn
   // when busy.
   function deliver(content: string) {
-    pi.sendMessage({ customType: "tuple-call-watch", content, display: false }, { triggerTurn: true });
+    pi.sendMessage({ customType: "tuple-call-sidekick", content, display: false }, { triggerTurn: true });
   }
 
   // The feed: loop `transcription show --wait` with a fresh per-process cursor.

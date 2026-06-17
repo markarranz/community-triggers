@@ -66,7 +66,7 @@ Once you have the summary, record it on the call itself so it's there in Tuple's
     tuple transcription set-title <id> "<a short, specific title for the whole call>"
     tuple transcription set-summary <id> "<your summary>"
 
-(If you have Tuple's MCP `set-call` tools available you may use those instead.)
+(If you have Tuple's MCP `set_call_title` and `set_call_summary` tools available, you may use those instead.)
 
 ## Stay available
 

@@ -31,22 +31,22 @@ WORKDIR="${TMP%/}/tuple-coach-pairing-claude/$(date +%Y%m%dT%H%M%S)-$$"
 LAUNCHER_FILE="${WORKDIR}/launch-coach-pairing-claude.command"
 mkdir -p "${WORKDIR}"
 
-# Write the COACH_PURPOSE value into the launcher as a literal assignment so it
-# survives being passed as a positional arg — no @Q or quoting operators needed.
-# bash 3.2 (macOS default) can't do ${var@Q}; a two-part heredoc avoids that:
-# the first part (unquoted <<EOF) expands the variable, the second (<<'SCRIPT')
-# is written verbatim.
-cat > "${LAUNCHER_FILE}" <<EOF
+# Write COACH_PURPOSE to a sidecar file the launcher reads at runtime. Keeping it
+# out of the launcher script means the purpose can hold any characters — quotes,
+# apostrophes ("don't"), em-dashes — without ever breaking the launcher's shell
+# quoting. (Mirrors how the call-summary triggers stage their prompt file.)
+printf '%s' "${COACH_PURPOSE}" > "${WORKDIR}/coach-purpose.txt"
+
+cat > "${LAUNCHER_FILE}" <<'SCRIPT'
 #!/bin/zsh -li
-COACH_PURPOSE='${COACH_PURPOSE}'
-EOF
-cat >> "${LAUNCHER_FILE}" <<'SCRIPT'
-printf '\e]0;Coach (Pairing) - Claude\a'
+printf '\e]0;Coach - Pairing - Claude\a'
 clear
-echo 'Starting Coach (Pairing) - Claude...'
+echo 'Starting Coach - Pairing - Claude...'
 echo
 
-cd "${0:A:h}" || exit 1
+SCRIPT_DIR="${0:A:h}"
+cd "${SCRIPT_DIR}" || exit 1
+COACH_PURPOSE="$(cat "${SCRIPT_DIR}/coach-purpose.txt")"
 
 if ! command -v tuple >/dev/null 2>&1; then
     echo "tuple was not found on your interactive shell PATH."

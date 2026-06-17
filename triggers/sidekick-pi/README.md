@@ -23,6 +23,7 @@ Pi answers to a small set of **watch words** — its name plus common Whisper mi
 - macOS
 - [Pi](https://pi.dev/) installed so `pi` works in a new terminal, with a provider authenticated (`pi`, then `/login`)
 - The `tuple` CLI on your interactive shell PATH, with the subcommands listed above
+  - Install it from the Tuple app: its Transcription settings have an **Install** button that links `tuple` onto your PATH.
 - Tuple transcription enabled for the call
 
 ## Installation

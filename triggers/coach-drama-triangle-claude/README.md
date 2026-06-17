@@ -51,6 +51,7 @@ The terminal runs `launch-coach-drama-triangle-claude.command`, whose `#!/bin/zs
 - macOS
 - [Claude Code](https://claude.com/claude-code) installed so `claude` works in a new terminal
 - The `tuple` CLI on your interactive shell PATH (with `connect` support)
+  - Install it from the Tuple app: its Transcription settings have an **Install** button that links `tuple` onto your PATH.
 - Tuple transcription enabled for the call
 
 ## Installation
@@ -67,7 +68,7 @@ The trigger fires the next time call transcription starts.
 `call-transcription-started` fires with no call-specific arguments. This trigger:
 
 1. Creates a working directory per start, `${TMPDIR:-/tmp}/tuple-coach-drama-triangle-claude/<timestamp>-<pid>`.
-2. Writes an executable `launch-coach-drama-triangle-claude.command` wrapper into it.
+2. Writes the `COACH_PURPOSE` to a `coach-purpose.txt` sidecar file and an executable `launch-coach-drama-triangle-claude.command` wrapper into it.
 3. Opens it in your preferred terminal via `open` (LaunchServices). No AppleScript and no direct binary launch, so it triggers no macOS accessibility prompt and no stray windows.
 4. The wrapper starts a login-interactive zsh, `cd`s to that directory, and runs `tuple connect --harness claude "<COACH_PURPOSE>"`.
 

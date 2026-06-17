@@ -14,6 +14,7 @@ It's a one-shot over the finished call — no `tuple connect`, nothing live to f
 - macOS
 - [Codex](https://developers.openai.com/codex/cli/) installed so `codex` works in a new terminal
 - The `tuple` CLI on your interactive shell PATH (with `transcription` support)
+  - Install it from the Tuple app: its Transcription settings have an **Install** button that links `tuple` onto your PATH.
 - A Slack connector available to Codex with a `slack_send_message` tool. The OpenAI-curated Slack plugin works out of the box — enable it and sign in so `codex` has the Slack tools available.
 - Tuple transcription enabled for the call
 
@@ -43,7 +44,7 @@ Leave it empty (the default) to DM yourself. The environment variable form also 
 
 1. Writes `slack-call-summary-codex-prompt.md` into a working directory (`${TMPDIR:-/tmp}/tuple-slack-call-summary-codex/<timestamp>-<pid>`), including the configured recipient and all instructions.
 2. Headlessly launches a login zsh (`nohup zsh -lc`, so `codex` and `tuple` resolve from your normal PATH — no terminal window) that runs `codex exec` in that directory with the prompt on stdin and `--dangerously-bypass-approvals-and-sandbox` (required for unattended Slack connector use). `tuple` in `Bash` lets Codex read the call; the Slack connector lets it send the message.
-3. Codex finds the call (`tuple transcription list`), reads it (`tuple transcription show <id> --with-events`), writes the title + summary back (`tuple transcription set-title` / `set-summary`), and sends the Slack message.
+3. Codex finds the call (`tuple call current` / `tuple transcription list`), reads it (`tuple transcription show <id> --with-events`), writes the title + summary back (`tuple transcription set-title` / `set-summary`), and sends the Slack message.
 
 ### A note on sandboxing
 

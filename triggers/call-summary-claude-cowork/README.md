@@ -18,6 +18,7 @@ Claude Cowork opens with the draft prompt; review it and press Enter to run.
 - macOS
 - Claude Desktop with Cowork enabled
 - The `tuple` CLI available to the desktop app (with `transcription` support)
+  - Install it from the Tuple app: its Transcription settings have an **Install** button that installs the `tuple` CLI.
 - Tuple transcription enabled for the call
 
 ## Installation

@@ -11,6 +11,7 @@ It's a one-shot over the finished call — no `tuple connect`, nothing live to f
 - macOS
 - [Claude Code](https://claude.com/claude-code) installed so `claude` works in a new terminal
 - The `tuple` CLI on your interactive shell PATH (with `transcription` support)
+  - Install it from the Tuple app: its Transcription settings have an **Install** button that links `tuple` onto your PATH.
 - A Slack MCP server or connector available to Claude Code. The **claude.ai Slack connector** works out of the box — verify with `claude mcp list` (you should see `claude.ai Slack: Connected`); connect it from [claude.ai](https://claude.ai) → Settings → Connectors, or run `/mcp` inside Claude Code. Any other Slack MCP works too, as long as its tools are allowed in your Claude Code permission settings (or you add its `mcp__<server>` rule to the allowlist in [call-transcription-complete](./call-transcription-complete)).
 - Tuple transcription enabled for the call
 

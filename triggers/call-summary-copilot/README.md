@@ -22,6 +22,7 @@ Nothing is hard-coded about the model — Copilot uses whatever you have configu
 - [GitHub Copilot CLI](https://docs.github.com/copilot/how-tos/use-copilot-agents/use-copilot-cli) installed (`npm i -g @github/copilot`) so `copilot` works in a new terminal. Run it once first to sign in.
 - A Copilot subscription that includes the CLI, not blocked by org policy. If you see `Access denied by policy settings`, an org/enterprise admin needs to enable the Copilot CLI policy. See [your Copilot settings](https://github.com/settings/copilot).
 - The `tuple` CLI on your interactive shell PATH (with `transcription` support)
+  - Install it from the Tuple app: its Transcription settings have an **Install** button that links `tuple` onto your PATH.
 - Tuple transcription enabled for the call
 
 ## Installation

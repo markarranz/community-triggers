@@ -21,6 +21,7 @@ Nothing is hard-coded about the model — Claude uses whatever you have configur
 - macOS
 - [Claude Code](https://claude.com/claude-code) installed so `claude` works in a new terminal
 - The `tuple` CLI on your interactive shell PATH (with `transcription` support)
+  - Install it from the Tuple app: its Transcription settings have an **Install** button that links `tuple` onto your PATH.
 - Tuple transcription enabled for the call
 
 ## Installation

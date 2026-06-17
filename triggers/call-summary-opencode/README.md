@@ -21,6 +21,7 @@ Nothing is hard-coded about the model — OpenCode uses whatever you have config
 - macOS
 - [OpenCode](https://opencode.ai/) installed so `opencode` works in a new terminal
 - The `tuple` CLI on your interactive shell PATH (with `transcription` support)
+  - Install it from the Tuple app: its Transcription settings have an **Install** button that links `tuple` onto your PATH.
 - Tuple transcription enabled for the call
 
 ## Installation

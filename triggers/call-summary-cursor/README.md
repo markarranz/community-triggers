@@ -21,6 +21,7 @@ Nothing is hard-coded about the model — Cursor uses whatever you have configur
 - macOS
 - [Cursor CLI](https://cursor.com/cli) installed so `cursor-agent` works in a new terminal. Run it once first to sign in.
 - The `tuple` CLI on your interactive shell PATH (with `transcription` support)
+  - Install it from the Tuple app: its Transcription settings have an **Install** button that links `tuple` onto your PATH.
 - Tuple transcription enabled for the call
 
 ## Installation

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# sidekick-opencode: when Tuple transcription starts, launch opencode as a live
+# sidekick-opencode: when Tuple transcription starts, launch OpenCode as a live
 # call companion.
 #
 # Everything about following the call — catching up on what's been said, watching
@@ -27,9 +27,9 @@ mkdir -p "${WORKDIR}"
 # the same PATH you get in a fresh terminal.
 cat > "${LAUNCHER_FILE}" <<'SCRIPT'
 #!/bin/zsh -li
-printf '\e]0;Tuple opencode Sidekick\a'
+printf '\e]0;Tuple OpenCode Sidekick\a'
 clear
-echo 'Connecting opencode to the call...'
+echo 'Connecting OpenCode to the call...'
 echo
 
 cd "${0:A:h}" || exit 1
