@@ -1,23 +1,29 @@
 # Sidekick - Pi
 
-Launches [Pi](https://pi.dev/) in the current Tuple transcription directory when transcription starts.
+Launches [Pi](https://pi.dev/) as an active live-call sidekick when Tuple transcription starts.
 
-The trigger writes a `launch-sidekick-pi.command` wrapper next to the live transcript files and opens it in your preferred terminal. The wrapper runs as `#!/bin/zsh -li`, so `pi` resolves from the same interactive shell environment you get in a new terminal. Nothing is hard-coded: Pi uses whichever provider and model you have configured as your default.
+When `call-transcription-started` fires, this trigger ships a small Pi extension into a working directory and opens a terminal that hands off to `tuple connect --harness pi`. Connect resolves call state and gives Pi a context prompt; the bundled extension follows the call in the background.
 
-## What makes this one different
+> **Requires a Tuple build whose `tuple` CLI exposes** `connect --harness` and `transcription show`. If your `tuple` CLI doesn't have them yet, this trigger won't work.
 
-Most editor sidekicks can only check the transcript when you speak to them. This one makes Pi an **active listener**: it consumes the call as it happens, drops a one-line summary of what was just covered so you can follow along at a glance, and interjects with substance only when something is worth saying.
+## What Pi does on the call
 
-The trigger ships a Pi extension, `tuple-call-watch.ts`, and installs it into the call's `.pi/extensions/` directory, where Pi loads it automatically at startup (no `/reload`, nothing to configure). The extension tails the live transcript and, whenever the talkers pause, feeds the new lines to Pi with `pi.sendMessage(..., { triggerTurn: true })`. That actually starts a turn, so Pi *reads and reasons over* each batch rather than waiting to be asked. Guided by its prompt, Pi leaves a one-line `·` summary of what they just covered on every batch (so you can follow the call live) and escalates to a `👋` interjection only when something matters: a risk or bug, a decision worth capturing, an action item, a correction, or a line addressed to it directly.
+The bundled extension (`tuple-call-sidekick.ts`) does one job well: it owns the live transcript feed **in the background** so Pi stays responsive to you. It reads the call through `tuple transcription show --wait`, looping with a fresh per-process `--cursor` for a gap-free, repeat-free catch-up and then live batches, and pushes new speech into Pi. So Pi is an active listener: it leaves a one-line `·` summary per batch, escalating to a `👋` interjection only when something matters — without ever running its own transcript loop. (The extension overrides connect's "follow the transcript yourself" instruction on startup so the call is never read twice.)
 
-The watcher only triggers a turn while Pi is idle, so **your own messages always take priority**. When you talk to Pi it answers you first, and the instant it finishes the next batch of call activity arrives and it keeps listening. The watch lives for the whole session: a question from you never pauses or ends it, and batches keep coming until the call ends. The transcript files remain the source of truth, so if the watcher ever stalls, Pi just reads `transcriptions.jsonl` and `events.jsonl` directly.
+It surfaces the watch state on Pi's toolbar (mode and batches seen), and adds one tool — **`set_watch_mode`** — to trade responsiveness for quiet (`realtime` / `balanced` / `low_noise`) as the call's shape changes. Nothing is hard-coded about the model: Pi uses whichever provider and model you have configured as your default.
 
-Pi opens with a one-line "listening and caught up" confirmation, leaves a quick `·` summary on each batch thereafter, writes a call-so-far checkpoint summary when recording stops or ends, and writes a final summary on `call_ended`.
+Unlike the other sidekick triggers (which are thin `tuple connect` launchers), Pi ships this extension because it benefits from owning the feed in the background rather than running the follow-loop in its own turn.
+
+## Customizing
+
+Pi answers to a small set of **watch words** — its name plus common Whisper mis-hearings — so it reliably notices when it's addressed on the call. Edit the `WATCH_WORDS` constant near the top of `tuple-call-sidekick.ts` to add your own name and its likely mistranscriptions.
 
 ## Prerequisites
 
 - macOS
 - [Pi](https://pi.dev/) installed so `pi` works in a new terminal, with a provider authenticated (`pi`, then `/login`)
+- The `tuple` CLI on your interactive shell PATH, with the subcommands listed above
+  - Install it from the Tuple app: its Transcription settings have an **Install** button that links `tuple` onto your PATH.
 - Tuple transcription enabled for the call
 
 ## Installation
@@ -30,14 +36,14 @@ The trigger fires the next time call transcription starts.
 
 ## How it works
 
-When `call-transcription-started` fires, Tuple provides `TUPLE_TRIGGER_CALL_ARTIFACTS_DIRECTORY`, the directory containing the current call transcription artifacts. This trigger:
+`call-transcription-started` fires with no call-specific arguments. This trigger:
 
-1. Copies the shipped `tuple-call-watch.ts` into `.pi/extensions/` inside that directory and writes a `tuple-call-watch.config.json` next to it (the artifacts directory and call id).
-2. Writes `sidekick-pi-prompt.md` into that directory.
-3. Writes an executable `launch-sidekick-pi.command` wrapper into that directory.
+1. Creates a working directory per start, `${TMPDIR:-/tmp}/tuple-pi-sidekick/<timestamp>-<pid>`.
+2. Copies `tuple-call-sidekick.ts` into `.pi/extensions/` there. Pi auto-discovers `.pi/extensions/*.ts` from its working directory, so the extension is active the moment Pi starts.
+3. Writes an executable `launch-pi-sidekick.command` wrapper into that directory.
 4. Opens it in your preferred terminal via `open` (LaunchServices). With `PREFERRED_TERM` empty it opens in your default handler for `.command` files; set it to one of `ghostty | iterm | alacritty | terminal` to force one. No AppleScript, so it triggers no macOS accessibility prompt.
-5. The wrapper starts a login-interactive zsh, changes into the transcription directory, and runs `pi "$(cat sidekick-pi-prompt.md)"`. Pi auto-discovers `.pi/extensions/*.ts` from that directory, so the watcher is active immediately.
+5. The wrapper starts a login-interactive zsh, `cd`s to the working directory, and runs `tuple connect --harness pi`.
 
-The watcher (`tuple-call-watch.ts`) tails `transcriptions.jsonl` and `events.jsonl` (plus sibling directories for the same call) from saved byte offsets, resolves `user_id` to speaker names, and batches new lines on natural pauses. It starts in `balanced` mode (polling about once a second, then flushing after a ~2s lull or every ~12s during continuous talking), and exposes a `tuple_call_watch_set_mode` tool so Pi can switch future batches to `realtime` for pair programming/debugging (faster polling and shorter pauses) or `low_noise` for presentations/long monologues as the call evolves. Recording stop/end events use a short grace period before flushing, so the final transcript lines can land before Pi writes the checkpoint. It feeds a batch, and triggers a turn, only while Pi is idle and has no pending messages, so consumption never collides with your messages or with itself. It degrades safely: if its config is missing it watches the working directory, and any error is swallowed rather than taking down the session.
+There is no dedup: each transcription-start gets its own directory, so stopping and restarting transcription in one call spawns a fresh sidekick while older ones keep running and stay queryable.
 
-For local script testing without opening a terminal, set `SIDEKICK_PI_DRY_RUN=1`. It still installs the extension so you can inspect it.
+For local script testing without opening a terminal, set `SIDEKICK_PI_DRY_RUN=1`. It still installs the extension and writes the launcher, then exits without launching it.

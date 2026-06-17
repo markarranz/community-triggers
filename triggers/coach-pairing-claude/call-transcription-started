@@ -1,169 +1,64 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# coach-pairing-claude: when Tuple transcription starts, launch Claude Code as a
+# live pairing coach.
+#
+# COACH_PURPOSE steers the agent's coaching framing. Edit it here to tune the
+# coaching style and focus without touching anything else in this trigger.
+#
+# Everything about following the call — catching up on what's been said, watching
+# the live transcript, and the base context prompt — is delegated to
+# `tuple connect --harness claude [purpose]`. The purpose string is the only
+# thing this trigger adds on top of sidekick-claude.
+
 # ---------------------------------------------------------------------------
-# Set your preferred terminal here, or leave empty to auto-detect.
-# One of: ghostty | iterm | alacritty | terminal
-# (Also overridable from the environment: PREFERRED_TERM=iterm)
+# Edit the coaching purpose here.
+# ---------------------------------------------------------------------------
+COACH_PURPOSE='You are a live pairing coach, not a sidekick. Watch the session for pairing anti-patterns — backseat driving, a quiet navigator, a silent driver, no shared goal, grinding without swaps or breaks — and, when confident, surface a single one-line move the pair can make right now (terminal line + best-effort desktop notification). Stay otherwise silent. Track talk-time balance, who last spoke, whether a goal was set, and how long since the last break or role swap. When the call ends, read the full transcript and write a retro to pairing-evaluation.md: talk-time balance, each anti-pattern with a timestamped quote, what worked (up to 3 moves), and the one highest-leverage thing to practice next session.'
+
+# ---------------------------------------------------------------------------
+# Set your preferred terminal here, or leave empty to use your default handler
+# for .command files. One of: ghostty | iterm | alacritty | terminal
 # ---------------------------------------------------------------------------
 PREFERRED_TERM="${PREFERRED_TERM:-}"
 
-LOG=/tmp/tuple-trigger-debug.log
-{
-    printf '\n=== %s call-transcription-started fired (coach-pairing-claude) ===\n' "$(date -u +%FT%TZ)"
-    printf 'cwd=%s pid=%s ppid=%s\n' "$(pwd)" "$$" "$PPID"
-    printf 'argv: %s\n' "$*"
-    printf 'env (filtered):\n'
-    env | grep -E '^(HOME|USER|PATH|TUPLE_|CURRENT_USER_)' | sort
-} >> "$LOG" 2>&1
-trap 'printf "exit status=%s on line %s\n" "$?" "$LINENO" >> "$LOG"' EXIT
-exec >>"$LOG" 2>&1
+# A fresh working directory per transcription-start (timestamp + this trigger's
+# PID) means stopping and restarting transcription spawns a new coach while
+# older ones keep running — no dedup.
+TMP="${TMPDIR:-/tmp}"
+WORKDIR="${TMP%/}/tuple-coach-pairing-claude/$(date +%Y%m%dT%H%M%S)-$$"
+LAUNCHER_FILE="${WORKDIR}/launch-coach-pairing-claude.command"
+mkdir -p "${WORKDIR}"
 
-if [ -z "${TUPLE_TRIGGER_CALL_ARTIFACTS_DIRECTORY:-}" ]; then
-    echo "coach-pairing-claude: TUPLE_TRIGGER_CALL_ARTIFACTS_DIRECTORY was not set" >&2
-    exit 1
-fi
+# Write COACH_PURPOSE to a sidecar file the launcher reads at runtime. Keeping it
+# out of the launcher script means the purpose can hold any characters — quotes,
+# apostrophes ("don't"), em-dashes — without ever breaking the launcher's shell
+# quoting. (Mirrors how the call-summary triggers stage their prompt file.)
+printf '%s' "${COACH_PURPOSE}" > "${WORKDIR}/coach-purpose.txt"
 
-TRANSCRIPTION_DIR="${TUPLE_TRIGGER_CALL_ARTIFACTS_DIRECTORY}"
-if [ ! -d "${TRANSCRIPTION_DIR}" ]; then
-    echo "coach-pairing-claude: transcription directory does not exist: ${TRANSCRIPTION_DIR}" >&2
-    exit 1
-fi
-
-SESSION_DIR="$(basename "${TRANSCRIPTION_DIR}")"
-PARENT_DIR="$(dirname "${TRANSCRIPTION_DIR}")"
-PARENT_NAME="$(basename "${PARENT_DIR}")"
-if [[ "${SESSION_DIR}" == *"@"* ]]; then
-    CALL_ID="${SESSION_DIR##*@}"
-elif [[ "${PARENT_NAME}" =~ ^[0-9A-Fa-f-]{8,}$ ]]; then
-    CALL_ID="${PARENT_NAME}"
-else
-    CALL_ID="${SESSION_DIR}"
-fi
-
-# Infer the identity-file env from the artifacts path: staging recordings live
-# under ~/.tuplestaging, production under ~/.tuple. No CLI probe needed.
-case "${TRANSCRIPTION_DIR}" in
-    *"/.tuplestaging/"*) IDENTITY_FILE="${HOME}/.tuplestaging/identity.md" ;;
-    *) IDENTITY_FILE="${HOME}/.tuple/identity.md" ;;
-esac
-
-# PID dedup stable across transcription restarts: keyed on the call id (which
-# survives stop/restart) and parked in the transcripts root, not the session
-# dir (which is recreated on each restart).
-PID_FILE="${PARENT_DIR}/.coach-pairing-claude-${CALL_ID}.pid"
-SYSTEM_PROMPT_FILE="${TRANSCRIPTION_DIR}/coach-pairing-claude-system-prompt.md"
-PROMPT_FILE="${TRANSCRIPTION_DIR}/coach-pairing-claude-initial-prompt.md"
-LAUNCHER_FILE="${TRANSCRIPTION_DIR}/launch-coach-pairing-claude.command"
-TRIGGER_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
-WATCHER_SRC="${TRIGGER_DIR}/tuple-call-watcher.py"
-WATCHER_DST="${TRANSCRIPTION_DIR}/tuple-call-watcher.py"
-
-# If a coach session is still alive (transcription was stopped and restarted),
-# leave it be — its watcher already follows the restarted session via the
-# `*@<call-id>/` glob.
-if [ -f "${PID_FILE}" ] && kill -0 "$(cat "${PID_FILE}" 2>/dev/null)" 2>/dev/null; then
-    echo "coach-pairing-claude: pairing coach already running for call ${CALL_ID}"
-    exit 0
-fi
-
-# Ship the fixed, deterministic transcript watcher next to the live transcript
-# files so the model runs it verbatim instead of authoring a poll loop each
-# session (which is non-deterministic and silently emits nothing when it reaches
-# for bash-isms under the zsh-launched Monitor).
-if [ -f "${WATCHER_SRC}" ]; then
-    cp "${WATCHER_SRC}" "${WATCHER_DST}"
-    chmod 0755 "${WATCHER_DST}"
-else
-    echo "coach-pairing-claude: watcher not found at ${WATCHER_SRC}" >&2
-    exit 1
-fi
-
-# Ship the best-effort desktop-notification helper next to the watcher so the
-# coach can raise a popup without hand-escaping AppleScript (it passes text as
-# arguments). Notifications are a bonus; the coach always keeps a terminal line,
-# so a missing helper is non-fatal.
-NOTIFY_SRC="${TRIGGER_DIR}/tuple-notify.sh"
-NOTIFY_DST="${TRANSCRIPTION_DIR}/tuple-notify.sh"
-if [ -f "${NOTIFY_SRC}" ]; then
-    cp "${NOTIFY_SRC}" "${NOTIFY_DST}"
-    chmod 0755 "${NOTIFY_DST}"
-fi
-
-# Build the appended system prompt: operational/framework rules first, then
-# optional identity grounding so the model knows your user's name and pairing
-# tendencies. NEVER rm -rf the session dir — it holds live transcription files.
-cp "${TRIGGER_DIR}/system-prompt.md" "${SYSTEM_PROMPT_FILE}"
-if [ -f "${IDENTITY_FILE}" ]; then
-    printf '\n---\n\n' >> "${SYSTEM_PROMPT_FILE}"
-    cat "${IDENTITY_FILE}" >> "${SYSTEM_PROMPT_FILE}"
-fi
-
-cat > "${PROMPT_FILE}.tmpl" <<'PROMPT'
-You are the pairing coach on a live Tuple pair-programming call. Transcription just started (or resumed) on this call. The active session for *this* call is `./__SESSIONDIR__/`, holding `events.jsonl` and `transcriptions.jsonl`; your working directory is the transcripts root, which holds one directory per session (this call's are every dir matching `./*@__CALLID__/`).
-
-Watch the live transcript for pairing anti-patterns — backseat driving, a quiet pair, a silent driver, no goal set, no swaps or breaks — and surface a one-line move your user can make to fix it (a terminal note plus a best-effort desktop notification, per your system prompt). Stay otherwise silent.
-
-Follow the Setup steps in your appended system prompt. First, catch up on everything said before you joined by running the bundled watcher once via Bash:
-
-    ./__SESSIONDIR__/tuple-call-watcher.py --catchup --offsets coach-pairing-claude
-
-Then start live-follow per Setup — subscribe with `Monitor` if you have it, otherwise loop the `--exit-on-batch` watcher via `Bash` — and otherwise stay silent.
-PROMPT
-# bash 3.2 (macOS default) mangles heredocs inside $()/`` so the prompt is
-# written straight to a file, then placeholders are substituted with sed.
-sed -e "s|__SESSIONDIR__|${SESSION_DIR}|g" -e "s|__CALLID__|${CALL_ID}|g" "${PROMPT_FILE}.tmpl" > "${PROMPT_FILE}"
-rm -f "${PROMPT_FILE}.tmpl"
-
-# The launcher self-locates via ${0:A:h} (the session dir it is written into) and
-# derives every path from there, so nothing but the call-id is baked in. CALL_ID
-# rides in through a short unquoted preamble — a plain assignment with no $$/$(...)
-# to escape — and the quoted SCRIPT body then uses $$ and $(cat ...) verbatim.
-cat > "${LAUNCHER_FILE}" <<EOF
+cat > "${LAUNCHER_FILE}" <<'SCRIPT'
 #!/bin/zsh -li
-CALL_ID='${CALL_ID}'
-EOF
-cat >> "${LAUNCHER_FILE}" <<'SCRIPT'
-SHORT_ID="${CALL_ID:0:8}"
-printf '\e]0;Tuple Coach - Pairing - Claude %s\a' "${SHORT_ID}"
+printf '\e]0;Coach - Pairing - Claude\a'
 clear
-echo 'Starting Coach - Pairing - Claude…'
+echo 'Starting Coach - Pairing - Claude...'
 echo
 
 SCRIPT_DIR="${0:A:h}"
-SYSTEM_PROMPT_FILE="${SCRIPT_DIR}/coach-pairing-claude-system-prompt.md"
-PROMPT_FILE="${SCRIPT_DIR}/coach-pairing-claude-initial-prompt.md"
-# PID file lives in the transcripts root (the session dir's parent), keyed by
-# call-id, so a mid-call transcription restart finds this session and skips
-# relaunching even though the session dir itself is recreated.
-PID_FILE="${SCRIPT_DIR}/../.coach-pairing-claude-${CALL_ID}.pid"
+cd "${SCRIPT_DIR}" || exit 1
+COACH_PURPOSE="$(cat "${SCRIPT_DIR}/coach-purpose.txt")"
 
-echo $$ > "${PID_FILE}"
-# cwd = the transcripts root (parent of this call's session dir) so the watcher
-# path `./<session-dir>/...` and the retro `./*@<call-id>/` glob both resolve.
-cd "${SCRIPT_DIR}/.." || exit 1
-
-if ! command -v claude >/dev/null 2>&1; then
-    echo "Claude Code was not found on your interactive shell PATH."
-    echo "Make sure 'claude' works in a new terminal, then run the trigger again."
-    echo
-    read '?Press return to close.'
-    exit 127
-fi
-if ! command -v python3 >/dev/null 2>&1; then
-    echo "The Tuple watcher needs python3 (install Xcode Command Line Tools: xcode-select --install)."
+if ! command -v tuple >/dev/null 2>&1; then
+    echo "tuple was not found on your interactive shell PATH."
+    echo "Make sure 'tuple' works in a new terminal, then run the trigger again."
     echo
     read '?Press return to close.'
     exit 127
 fi
 
-exec claude \
-    --model opus \
-    --effort low \
-    --name "Tuple Coach - Pairing - Claude" \
-    --append-system-prompt-file "${SYSTEM_PROMPT_FILE}" \
-    "$(cat "${PROMPT_FILE}")"
+exec tuple connect --harness claude "$COACH_PURPOSE"
 SCRIPT
+
 chmod 0755 "${LAUNCHER_FILE}"
 
 # --- launch_in_terminal: open the .command launcher in the user's terminal ---

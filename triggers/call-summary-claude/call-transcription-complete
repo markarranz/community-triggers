@@ -1,108 +1,41 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-LOG=/tmp/tuple-trigger-debug.log
-{
-    printf '\n=== %s call-transcription-complete fired (call-summary-claude) ===\n' "$(date -u +%FT%TZ)"
-    printf 'cwd=%s pid=%s ppid=%s\n' "$(pwd)" "$$" "$PPID"
-    printf 'argv: %s\n' "$*"
-    printf 'env (filtered):\n'
-    env | grep -E '^(HOME|USER|PATH|TUPLE_|CURRENT_USER_)' | sort
-} >> "$LOG" 2>&1
-trap 'printf "exit status=%s on line %s\n" "$?" "$LINENO" >> "$LOG"' EXIT
+# call-summary-claude: when a Tuple transcription completes, open Claude Code in a
+# terminal and have it summarize the call — then write the title and summary back
+# onto the call (so they show up in Tuple's Call History).
+#
+# This is not a live-call companion (that's the sidekick triggers), so there's no
+# `tuple connect` and nothing to follow in real time. The trigger just writes a
+# plain prompt and launches Claude; Claude finds the call, reads its stored
+# transcript with the `tuple` CLI, and does the work. The transcription triggers
+# receive no call-specific args, so Claude resolves the call id itself — the
+# trigger needs no call id and no special PATH.
 
-exec >>"$LOG" 2>&1
-
-if [ -z "${TUPLE_TRIGGER_CALL_ARTIFACTS_DIRECTORY:-}" ]; then
-    echo "call-summary-claude: TUPLE_TRIGGER_CALL_ARTIFACTS_DIRECTORY was not set" >&2
-    exit 1
-fi
-
-TRANSCRIPTION_DIR="${TUPLE_TRIGGER_CALL_ARTIFACTS_DIRECTORY}"
-if [ ! -d "${TRANSCRIPTION_DIR}" ]; then
-    echo "call-summary-claude: transcription directory does not exist: ${TRANSCRIPTION_DIR}" >&2
-    exit 1
-fi
-
-SESSION_DIR="$(basename "${TRANSCRIPTION_DIR}")"
-PARENT_DIR="$(dirname "${TRANSCRIPTION_DIR}")"
-PARENT_NAME="$(basename "${PARENT_DIR}")"
-if [[ "${SESSION_DIR}" == *"@"* ]]; then
-    CALL_ID="${SESSION_DIR##*@}"
-elif [[ "${PARENT_NAME}" =~ ^[0-9A-Fa-f-]{8,}$ ]]; then
-    CALL_ID="${PARENT_NAME}"
-else
-    CALL_ID="${SESSION_DIR}"
-fi
-
-PID_FILE="${TRANSCRIPTION_DIR}/call-summary-claude.pid"
-PROMPT_FILE="${TRANSCRIPTION_DIR}/call-summary-claude-prompt.md"
-# Set your preferred terminal here, or leave empty to auto-detect.
-# One of: ghostty | iterm | alacritty | terminal
-# (Also overridable from the environment: PREFERRED_TERM=iterm)
+# Set your preferred terminal here, or leave empty to use your default handler
+# for .command files. One of: ghostty | iterm | alacritty | terminal
 PREFERRED_TERM="${PREFERRED_TERM:-}"
-LAUNCHER_FILE="${TRANSCRIPTION_DIR}/launch-call-summary-claude.command"
-TRIGGER_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
-WATCHER_SRC="${TRIGGER_DIR}/tuple-call-watcher.py"
-WATCHER_DST="${TRANSCRIPTION_DIR}/tuple-call-watcher.py"
 
-if [ -f "${PID_FILE}" ] && kill -0 "$(cat "${PID_FILE}" 2>/dev/null)" 2>/dev/null; then
-    echo "call-summary-claude: Claude summary already running for ${TRANSCRIPTION_DIR}"
-    exit 0
-fi
+TMP="${TMPDIR:-/tmp}"
+WORKDIR="${TMP%/}/tuple-call-summary-claude/$(date +%Y%m%dT%H%M%S)-$$"
+PROMPT_FILE="${WORKDIR}/call-summary-claude-prompt.md"
+LAUNCHER_FILE="${WORKDIR}/launch-call-summary-claude.command"
+mkdir -p "${WORKDIR}"
 
-# Ship the fixed transcript watcher so the summary reads the backlog
-# deterministically via --catchup instead of hand-reading the JSONL files.
-if [ -f "${WATCHER_SRC}" ]; then
-    cp "${WATCHER_SRC}" "${WATCHER_DST}"
-    chmod 0755 "${WATCHER_DST}"
-else
-    echo "call-summary-claude: watcher not found at ${WATCHER_SRC}" >&2
-    exit 1
-fi
+cat > "${PROMPT_FILE}" <<'PROMPT'
+A Tuple pair-programming call just finished, and you've been asked to summarize it. Other call participants do not see your output; you interact only with the user at this terminal.
 
-{
-    cat <<'PROMPT'
-You are summarizing a completed Tuple pair-programming transcription. Your working directory is the Tuple transcription directory opened by this trigger.
+## Find the call
 
-PROMPT
-    printf 'The trigger fired for:\n\n'
-    printf -- '- Transcription directory: %s\n' "${TRANSCRIPTION_DIR}"
-    printf -- '- Session directory name: %s\n' "${SESSION_DIR}"
-    printf -- '- Inferred call id: %s\n' "${CALL_ID}"
-    cat <<'PROMPT'
+Get the call id with the `tuple` CLI: run `tuple call current` if you're still on the call, otherwise take the most recent call from `tuple transcription list` (it lists stored calls newest first).
 
-The current directory should contain `events.jsonl` and `transcriptions.jsonl`, one JSON record per line. Other call participants do not see your output; you interact only with the user at this terminal.
+## Read it
 
-## Goal
+`tuple transcription show <id>` prints the full transcript with speaker names. Add `--with-events` if join/leave/screen events would help anchor decisions. (Use `--format json` if you'd rather parse the records; the default is human-readable.)
 
-Read the full transcript (see How to read the transcript), then immediately produce a tight, useful call summary. This is a completed-transcription trigger: run the watcher once in `--catchup` mode to read the backlog — do not start a live or continuous watch.
+## Summarize
 
-## File schemas
-
-| File | Fields | Notes |
-| --- | --- | --- |
-| `events.jsonl` | `category, message, time, user?` | Categories commonly include `recording_started`, `recording_stopped`, `user_joined`, `user_left`, `user_audio_started`, `user_audio_stopped`, and `call_ended`. |
-| `transcriptions.jsonl` | `start, end, text, user_id` | Resolve `user_id` to a name from `user_joined` events when available. |
-
-If a field looks unfamiliar, inspect a few records and adapt rather than assuming.
-
-## How to read the transcript
-
-Tuple ships a fixed watcher script in this directory. Read the whole call by running it once in catch-up mode:
-
-    ./tuple-call-watcher.py --catchup
-
-It prints every record across all of this call's session directories (including any mid-call restarts) as tagged lines:
-
-    T|<session-dir>|<json-record>   a transcriptions.jsonl record
-    E|<session-dir>|<json-record>   an events.jsonl record
-
-Parse the `<json-record>` portion of each. Build a speaker map from `user_joined` events; the watcher already drops the noisy `user_audio_started`/`user_audio_stopped` events. Use timestamps when they help anchor decisions, action items, or follow-up questions. (The raw `events.jsonl` / `transcriptions.jsonl` files are still here if you want to read one directly.)
-
-## Output
-
-Produce the summary first, without preamble. Use this shape:
+Produce a tight, useful summary first, without preamble:
 
 ## Summary
 
@@ -122,16 +55,26 @@ Bullets for unresolved questions or follow-ups. Omit this section if there were 
 
 ## Notable context
 
-Only include details that would help the user remember the call later. Omit this section if there is nothing useful.
+Only details that would help the user remember the call later. Omit if there's nothing useful.
 
-If the transcript is empty or too sparse to summarize, say that plainly and list which files you found.
+If the transcript is empty or too sparse to summarize, say so plainly.
 
-## After the summary
+## Write it back to the call
 
-Stay available for follow-up questions in this Claude Code session. When the user asks a question, answer from the transcript files first. Cite speaker names and timestamps when useful. If the user asks for a different format, transform the same transcript-backed facts rather than inventing missing context.
+Once you have the summary, record it on the call itself so it's there in Tuple's Call History:
+
+    tuple transcription set-title <id> "<a short, specific title for the whole call>"
+    tuple transcription set-summary <id> "<your summary>"
+
+(If you have Tuple's MCP `set_call_title` and `set_call_summary` tools available, you may use those instead.)
+
+## Stay available
+
+Keep this session open for follow-up questions, answering from the transcript. If the user asks for a different format, transform the same transcript-backed facts rather than inventing context.
 PROMPT
-} > "${PROMPT_FILE}"
 
+# The launcher runs as a login-interactive zsh so `claude` and `tuple` resolve from
+# the same PATH you get in a fresh terminal.
 cat > "${LAUNCHER_FILE}" <<'SCRIPT'
 #!/bin/zsh -li
 printf '\e]0;Tuple Call Summary - Claude\a'
@@ -140,10 +83,7 @@ echo 'Starting Call Summary - Claude…'
 echo
 
 SCRIPT_DIR="${0:A:h}"
-PID_FILE="${SCRIPT_DIR}/call-summary-claude.pid"
 PROMPT_FILE="${SCRIPT_DIR}/call-summary-claude-prompt.md"
-
-echo $$ > "${PID_FILE}"
 cd "${SCRIPT_DIR}" || exit 1
 
 if ! command -v claude >/dev/null 2>&1; then
@@ -153,8 +93,9 @@ if ! command -v claude >/dev/null 2>&1; then
     read '?Press return to close.'
     exit 127
 fi
-if ! command -v python3 >/dev/null 2>&1; then
-    echo "The Tuple watcher needs python3 (install Xcode Command Line Tools: xcode-select --install)."
+if ! command -v tuple >/dev/null 2>&1; then
+    echo "The 'tuple' CLI was not found on your interactive shell PATH."
+    echo "Make sure 'tuple' works in a new terminal, then run the trigger again."
     echo
     read '?Press return to close.'
     exit 127

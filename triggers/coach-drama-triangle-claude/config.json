@@ -1,6 +1,6 @@
 {
   "name": "Coach - Drama Triangle - Claude",
-  "description": "During the call, Claude fires a quiet macOS notification with a one-line reframe when you slip into a Karpman Drama Triangle role (Victim, Persecutor, Rescuer). When the call ends, the same session writes a per-teammate analysis to drama-evaluation.md with concrete strategies for engaging each person going forward.",
+  "description": "Launches Claude Code via `tuple connect` as a live drama-triangle coach. During the call it watches your own lines for Victim, Persecutor, or Rescuer patterns and fires a quiet one-line reframe as a terminal nudge and macOS notification. When the call ends, it writes a drama-evaluation.md with per-participant profiles and concrete phrases to try differently next time.",
   "category": "Real-Time Coach",
   "platforms": ["macos"],
   "language": "bash"
